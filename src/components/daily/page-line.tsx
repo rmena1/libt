@@ -115,9 +115,9 @@ export function PageLine({
   }
   
   return (
-    <div className="group relative flex items-start gap-2 py-0.5">
+    <div className="group relative flex items-start gap-3 py-0.5">
       {/* Bullet point */}
-      <div className="mt-2 flex-shrink-0 w-1.5 h-1.5 rounded-full bg-gray-200 group-focus-within:bg-gray-400 transition-colors" />
+      <div className="mt-[11px] flex-shrink-0 w-1.5 h-1.5 rounded-full bg-gray-300 group-focus-within:bg-gray-400 transition-colors" />
       
       {/* Content */}
       <div className="flex-1 min-w-0 relative">

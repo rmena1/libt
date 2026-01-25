@@ -66,7 +66,7 @@ export function DayCard({ date, initialPages }: DayCardProps) {
   
   return (
     <div className={cn(
-      'min-h-[280px] md:min-h-[320px] py-6 px-4 md:px-6',
+      'min-h-[280px] md:min-h-[320px] py-6 px-5 md:px-8',
       'border-b border-gray-100 last:border-b-0',
       isTodayDate && 'bg-gray-50/50'
     )}>
@@ -79,7 +79,7 @@ export function DayCard({ date, initialPages }: DayCardProps) {
           {formatDateDisplay(date)}
         </h2>
         {isTodayDate && (
-          <span className="rounded-full bg-gray-900 px-2.5 py-0.5 text-xs font-medium text-white">
+          <span className="rounded-full bg-gray-900 px-3 py-1 text-xs font-medium text-white">
             Today
           </span>
         )}

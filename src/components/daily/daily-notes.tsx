@@ -114,7 +114,7 @@ export function DailyNotes({
   return (
     <div
       ref={containerRef}
-      className="h-screen overflow-y-auto bg-white"
+      className="h-screen overflow-y-auto bg-white px-2 md:px-4"
     >
       {/* Loading indicator - past */}
       {isLoadingPast && (
