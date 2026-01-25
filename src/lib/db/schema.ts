@@ -1,0 +1,91 @@
+import { sqliteTable, text, integer, index, uniqueIndex } from 'drizzle-orm/sqlite-core'
+
+// ============================================================================
+// USERS
+// ============================================================================
+export const users = sqliteTable('users', {
+  id: text('id').primaryKey(), // nanoid
+  email: text('email').notNull().unique(),
+  passwordHash: text('password_hash').notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+})
+
+// ============================================================================
+// SESSIONS (for auth)
+// ============================================================================
+export const sessions = sqliteTable('sessions', {
+  id: text('id').primaryKey(), // session token
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+}, (table) => [
+  index('idx_sessions_user').on(table.userId),
+  index('idx_sessions_expires').on(table.expiresAt),
+])
+
+// ============================================================================
+// FOLDERS
+// ============================================================================
+export const folders = sqliteTable('folders', {
+  id: text('id').primaryKey(), // nanoid
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  slug: text('slug').notNull(), // URL-safe version
+  parentId: text('parent_id').references((): ReturnType<typeof text> => folders.id, { onDelete: 'cascade' }),
+  order: integer('order').notNull().default(0),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+}, (table) => [
+  index('idx_folders_user').on(table.userId),
+  index('idx_folders_parent').on(table.parentId),
+  uniqueIndex('idx_folders_user_slug').on(table.userId, table.slug),
+])
+
+// ============================================================================
+// PAGES
+// ============================================================================
+export const pages = sqliteTable('pages', {
+  id: text('id').primaryKey(), // nanoid
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  
+  // Content
+  content: text('content').notNull().default(''),
+  
+  // Hierarchy
+  dailyDate: text('daily_date'), // YYYY-MM-DD if part of daily note
+  folderId: text('folder_id').references(() => folders.id, { onDelete: 'set null' }),
+  parentPageId: text('parent_page_id').references((): ReturnType<typeof text> => pages.id, { onDelete: 'cascade' }),
+  order: integer('order').notNull().default(0),
+  
+  // Task fields
+  isTask: integer('is_task', { mode: 'boolean' }).notNull().default(false),
+  taskCompleted: integer('task_completed', { mode: 'boolean' }).notNull().default(false),
+  taskCompletedAt: integer('task_completed_at', { mode: 'timestamp' }),
+  taskDate: text('task_date'), // YYYY-MM-DD for task due date
+  taskPriority: text('task_priority', { enum: ['low', 'medium', 'high'] }),
+  
+  // Timestamps
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+}, (table) => [
+  index('idx_pages_user_daily').on(table.userId, table.dailyDate),
+  index('idx_pages_user_folder').on(table.userId, table.folderId),
+  index('idx_pages_parent').on(table.parentPageId),
+  index('idx_pages_tasks').on(table.userId, table.isTask, table.taskDate),
+])
+
+// ============================================================================
+// TYPES
+// ============================================================================
+export type User = typeof users.$inferSelect
+export type NewUser = typeof users.$inferInsert
+
+export type Session = typeof sessions.$inferSelect
+export type NewSession = typeof sessions.$inferInsert
+
+export type Folder = typeof folders.$inferSelect
+export type NewFolder = typeof folders.$inferInsert
+
+export type Page = typeof pages.$inferSelect
+export type NewPage = typeof pages.$inferInsert
