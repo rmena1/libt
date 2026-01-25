@@ -66,7 +66,7 @@ export function DayCard({ date, initialPages }: DayCardProps) {
   
   return (
     <div className={cn(
-      'min-h-[280px] md:min-h-[320px] py-6 px-5 md:px-8',
+      'min-h-[280px] md:min-h-[320px] py-8 px-6 md:px-10',
       'border-b border-gray-100 last:border-b-0',
       isTodayDate && 'bg-gray-50/50'
     )}>
