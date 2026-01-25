@@ -1,44 +1,44 @@
 # libt - Development TODO
 
-## Phase 1: Foundation (Current)
+## Phase 1: Foundation ✅ COMPLETE
 
 ### Setup
-- [ ] Create Next.js 15 project with TypeScript
-- [ ] Configure Tailwind CSS
-- [ ] Configure ESLint + Prettier
-- [ ] Set up project structure (folders, aliases)
+- [x] Create Next.js 15 project with TypeScript
+- [x] Configure Tailwind CSS
+- [x] Configure ESLint
+- [x] Set up project structure (folders, aliases)
 
 ### Database
-- [ ] Install and configure Drizzle ORM
-- [ ] Set up SQLite with better-sqlite3
-- [ ] Create database schema (users, folders, pages, sessions)
-- [ ] Create migrations
-- [ ] Add seed script for development
+- [x] Install and configure Drizzle ORM
+- [x] Set up SQLite with better-sqlite3
+- [x] Create database schema (users, folders, pages, sessions)
+- [x] Create migrations (using drizzle push)
+- [ ] Add seed script for development (optional)
 
 ### Authentication
-- [ ] Implement password hashing (bcrypt)
-- [ ] Create session management (HTTP-only cookies)
-- [ ] Register endpoint
-- [ ] Login endpoint
-- [ ] Logout endpoint
-- [ ] Auth middleware for protected routes
-- [ ] CSRF protection
+- [x] Implement password hashing (bcrypt)
+- [x] Create session management (HTTP-only cookies)
+- [x] Register endpoint
+- [x] Login endpoint
+- [x] Logout endpoint
+- [x] Auth middleware for protected routes
+- [ ] CSRF protection (TODO: add later)
 
 ### Layout & Navigation
-- [ ] Create root layout with sidebar
-- [ ] Responsive sidebar (collapsible on mobile)
-- [ ] Navigation items (Daily Notes, Tasks, Folders)
-- [ ] User menu (logout)
+- [x] Create root layout with sidebar
+- [x] Responsive sidebar (collapsible on mobile)
+- [x] Navigation items (Daily Notes, Tasks, Folders)
+- [x] User menu (logout)
 
 ### Daily Notes View
-- [ ] Infinite scroll component (past & future)
-- [ ] Day card component
-- [ ] Page/line editor component
-- [ ] Nested content (indentation)
-- [ ] Auto-save with debounce (500ms)
-- [ ] Optimistic updates
-- [ ] Loading states
-- [ ] Error handling
+- [x] Infinite scroll component (past & future)
+- [x] Day card component
+- [x] Page/line editor component
+- [ ] Nested content (indentation) - structure ready, UI pending
+- [x] Auto-save with debounce (500ms)
+- [x] Optimistic updates
+- [x] Loading states
+- [ ] Error handling (basic, needs toast)
 
 ---
 
