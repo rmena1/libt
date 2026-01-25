@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { type Page } from '@/lib/db'
 import { updatePage, deletePage } from '@/lib/actions/pages'
 import { cn, debounce } from '@/lib/utils'
@@ -20,10 +20,11 @@ export function PageLine({
   onDelete,
   onEnter,
   autoFocus = false,
-  placeholder = 'Write something...',
+  placeholder = '',
 }: PageLineProps) {
   const [content, setContent] = useState(page.content)
   const [isSaving, setIsSaving] = useState(false)
+  const [hasSaved, setHasSaved] = useState(false)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const lastSavedContent = useRef(page.content)
   
@@ -31,7 +32,7 @@ export function PageLine({
   useEffect(() => {
     if (inputRef.current) {
       inputRef.current.style.height = 'auto'
-      inputRef.current.style.height = inputRef.current.scrollHeight + 'px'
+      inputRef.current.style.height = Math.max(inputRef.current.scrollHeight, 28) + 'px'
     }
   }, [content])
   
@@ -45,8 +46,8 @@ export function PageLine({
   }, [autoFocus])
   
   // Debounced save function
-  const debouncedSave = useCallback(
-    debounce(async (newContent: string) => {
+  const debouncedSave = useMemo(
+    () => debounce(async (newContent: string) => {
       if (newContent === lastSavedContent.current) return
       
       setIsSaving(true)
@@ -54,9 +55,10 @@ export function PageLine({
         const updated = await updatePage(page.id, { content: newContent })
         lastSavedContent.current = newContent
         onUpdate?.(updated)
+        setHasSaved(true)
+        setTimeout(() => setHasSaved(false), 1500)
       } catch (error) {
         console.error('Failed to save:', error)
-        // Optionally show error toast
       } finally {
         setIsSaving(false)
       }
@@ -113,23 +115,12 @@ export function PageLine({
   }
   
   return (
-    <div className="group relative flex items-start gap-2">
-      {/* Drag handle (future) */}
-      <div className="mt-2.5 flex-shrink-0 opacity-0 transition-opacity group-hover:opacity-100">
-        <div className="h-4 w-4 cursor-grab text-gray-300">
-          <svg viewBox="0 0 24 24" fill="currentColor">
-            <circle cx="9" cy="6" r="1.5" />
-            <circle cx="15" cy="6" r="1.5" />
-            <circle cx="9" cy="12" r="1.5" />
-            <circle cx="15" cy="12" r="1.5" />
-            <circle cx="9" cy="18" r="1.5" />
-            <circle cx="15" cy="18" r="1.5" />
-          </svg>
-        </div>
-      </div>
+    <div className="group relative flex items-start gap-2 py-0.5">
+      {/* Bullet point */}
+      <div className="mt-2 flex-shrink-0 w-1.5 h-1.5 rounded-full bg-gray-200 group-focus-within:bg-gray-400 transition-colors" />
       
       {/* Content */}
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 relative">
         <textarea
           ref={inputRef}
           value={content}
@@ -139,19 +130,24 @@ export function PageLine({
           placeholder={placeholder}
           rows={1}
           className={cn(
-            'w-full resize-none overflow-hidden bg-transparent py-1.5 text-base leading-relaxed',
-            'placeholder:text-gray-300 focus:outline-none',
-            'text-gray-900'
+            'w-full resize-none overflow-hidden bg-transparent py-0.5 pr-16',
+            'text-base leading-7 text-gray-900',
+            'placeholder:text-gray-300',
+            'focus:outline-none',
+            'selection:bg-gray-200'
           )}
         />
-      </div>
-      
-      {/* Saving indicator */}
-      {isSaving && (
-        <div className="absolute right-0 top-2 text-xs text-gray-400">
-          Saving...
+        
+        {/* Save indicator */}
+        <div className="absolute right-0 top-1 text-xs">
+          {isSaving && (
+            <span className="text-gray-400">Saving...</span>
+          )}
+          {hasSaved && !isSaving && (
+            <span className="text-gray-300">Saved</span>
+          )}
         </div>
-      )}
+      </div>
     </div>
   )
 }

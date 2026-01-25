@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { type Page } from '@/lib/db'
 import { getDailyPagesRange } from '@/lib/actions/pages'
 import { DayCard } from './day-card'
-import { today, addDays, formatDate } from '@/lib/utils'
+import { today, addDays } from '@/lib/utils'
 
 interface DailyNotesProps {
   initialPages: Record<string, Page[]>
@@ -13,7 +13,7 @@ interface DailyNotesProps {
 }
 
 const DAYS_TO_LOAD = 7 // Load 7 days at a time
-const SCROLL_THRESHOLD = 200 // px from edge to trigger load
+const SCROLL_THRESHOLD = 300 // px from edge to trigger load
 
 export function DailyNotes({
   initialPages,
@@ -32,7 +32,9 @@ export function DailyNotes({
   // Scroll to today on mount
   useEffect(() => {
     if (todayRef.current) {
-      todayRef.current.scrollIntoView({ behavior: 'instant', block: 'start' })
+      setTimeout(() => {
+        todayRef.current?.scrollIntoView({ behavior: 'instant', block: 'start' })
+      }, 100)
     }
   }, [])
   
@@ -112,17 +114,17 @@ export function DailyNotes({
   return (
     <div
       ref={containerRef}
-      className="h-screen overflow-y-auto px-4 md:px-8 lg:px-12"
+      className="h-screen overflow-y-auto bg-white"
     >
       {/* Loading indicator - past */}
       {isLoadingPast && (
-        <div className="py-4 text-center text-sm text-gray-400">
-          Loading...
+        <div className="py-6 text-center">
+          <span className="text-sm text-gray-400">Loading...</span>
         </div>
       )}
       
       {/* Days */}
-      <div className="mx-auto max-w-2xl divide-y divide-gray-100">
+      <div className="mx-auto max-w-2xl">
         {dates.map((date) => (
           <div
             key={date}
@@ -138,13 +140,13 @@ export function DailyNotes({
       
       {/* Loading indicator - future */}
       {isLoadingFuture && (
-        <div className="py-4 text-center text-sm text-gray-400">
-          Loading...
+        <div className="py-6 text-center">
+          <span className="text-sm text-gray-400">Loading...</span>
         </div>
       )}
       
-      {/* Bottom padding */}
-      <div className="h-32" />
+      {/* Bottom padding for scroll */}
+      <div className="h-40" />
     </div>
   )
 }

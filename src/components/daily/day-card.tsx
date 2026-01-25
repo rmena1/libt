@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import { type Page } from '@/lib/db'
 import { createPage } from '@/lib/actions/pages'
 import { PageLine } from './page-line'
@@ -14,6 +14,7 @@ interface DayCardProps {
 export function DayCard({ date, initialPages }: DayCardProps) {
   const [pages, setPages] = useState<Page[]>(initialPages)
   const [isCreating, setIsCreating] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
   
   // Create a new page
   const handleCreatePage = useCallback(async (afterIndex?: number) => {
@@ -49,53 +50,75 @@ export function DayCard({ date, initialPages }: DayCardProps) {
   }, [])
   
   // Delete a page from the list
-  const handleDeletePage = useCallback((pageId: string, index: number) => {
+  const handleDeletePage = useCallback((pageId: string) => {
     setPages(prev => prev.filter(p => p.id !== pageId))
-    // Focus previous page if exists
-    // This would need refs to implement properly
   }, [])
+  
+  // Click on empty area to create new page
+  const handleContainerClick = useCallback((e: React.MouseEvent) => {
+    // Only trigger if clicking on the container itself, not children
+    if (e.target === containerRef.current && pages.length === 0) {
+      handleCreatePage()
+    }
+  }, [pages.length, handleCreatePage])
   
   const isTodayDate = isToday(date)
   
   return (
-    <div className="py-6">
+    <div className={cn(
+      'min-h-[280px] md:min-h-[320px] py-6 px-4 md:px-6',
+      'border-b border-gray-100 last:border-b-0',
+      isTodayDate && 'bg-gray-50/50'
+    )}>
       {/* Date header */}
-      <div className="mb-4 flex items-center gap-3">
+      <div className="mb-6 flex items-center gap-3">
         <h2 className={cn(
-          'text-sm font-medium',
-          isTodayDate ? 'text-gray-900' : 'text-gray-500'
+          'text-sm font-medium tracking-wide',
+          isTodayDate ? 'text-gray-900' : 'text-gray-400'
         )}>
           {formatDateDisplay(date)}
         </h2>
         {isTodayDate && (
-          <span className="rounded-full bg-gray-900 px-2 py-0.5 text-xs text-white">
+          <span className="rounded-full bg-gray-900 px-2.5 py-0.5 text-xs font-medium text-white">
             Today
           </span>
         )}
       </div>
       
-      {/* Pages */}
-      <div className="space-y-1 pl-1">
-        {pages.map((page, index) => (
-          <PageLine
-            key={page.id}
-            page={page}
-            onUpdate={handleUpdatePage}
-            onDelete={() => handleDeletePage(page.id, index)}
-            onEnter={() => handleCreatePage(index)}
-            autoFocus={index === pages.length - 1 && page.content === ''}
-            placeholder={index === 0 ? "What's on your mind?" : 'Continue writing...'}
-          />
-        ))}
-        
-        {/* Empty state / Add button */}
-        {pages.length === 0 && (
+      {/* Content area */}
+      <div 
+        ref={containerRef}
+        onClick={handleContainerClick}
+        className={cn(
+          'min-h-[180px] md:min-h-[220px] cursor-text',
+          pages.length === 0 && 'flex items-start'
+        )}
+      >
+        {pages.length > 0 ? (
+          <div className="space-y-1">
+            {pages.map((page, index) => (
+              <PageLine
+                key={page.id}
+                page={page}
+                onUpdate={handleUpdatePage}
+                onDelete={() => handleDeletePage(page.id)}
+                onEnter={() => handleCreatePage(index)}
+                autoFocus={index === pages.length - 1 && page.content === ''}
+                placeholder={index === 0 ? "What's on your mind?" : ''}
+              />
+            ))}
+          </div>
+        ) : (
           <button
             onClick={() => handleCreatePage()}
             disabled={isCreating}
-            className="w-full py-2 text-left text-sm text-gray-300 hover:text-gray-400 transition-colors"
+            className={cn(
+              'w-full text-left text-base text-gray-300 transition-colors',
+              'hover:text-gray-400 focus:outline-none',
+              isTodayDate ? 'text-gray-400' : 'text-gray-300'
+            )}
           >
-            {isCreating ? 'Creating...' : 'Click to start writing...'}
+            {isCreating ? 'Creating...' : isTodayDate ? "What's on your mind today?" : 'Click to add a note...'}
           </button>
         )}
       </div>

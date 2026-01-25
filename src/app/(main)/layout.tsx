@@ -19,7 +19,10 @@ export default async function MainLayout({
       
       {/* Main content */}
       <main className="lg:pl-64">
-        <div className="min-h-screen">
+        {/* Mobile header spacer */}
+        <div className="h-14 lg:h-0" />
+        
+        <div className="min-h-[calc(100vh-3.5rem)] lg:min-h-screen">
           {children}
         </div>
       </main>
