@@ -15,10 +15,12 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
     await handleGoogleCallback(code)
     redirect('/daily')
   }
-  // Load initial range: 7 days before today to 7 days after
+  // If a ?date= param is provided, center the range around that date
+  const targetDate = typeof params.date === 'string' ? params.date : null
   const todayDate = today()
-  const startDate = addDays(todayDate, -7)
-  const endDate = addDays(todayDate, 7)
+  const centerDate = targetDate || todayDate
+  const startDate = addDays(centerDate, -7)
+  const endDate = addDays(centerDate, 7)
   
   const [initialPages, initialProjectedTasks, initialFolders, initialOverdueTasks] = await Promise.all([
     getDailyPagesRange(startDate, endDate),
@@ -40,6 +42,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
       initialFolders={initialFolders}
       initialChildPages={initialChildPages}
       initialOverdueTasks={initialOverdueTasks}
+      scrollToDate={targetDate}
     />
   )
 }

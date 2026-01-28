@@ -17,6 +17,7 @@ interface DailyNotesProps {
   initialFolders?: import('@/lib/db').Folder[]
   initialChildPages?: Record<string, Page[]>  // parentPageId → child pages
   initialOverdueTasks?: Page[]  // Tasks overdue (past date, not completed)
+  scrollToDate?: string | null  // Date to scroll to on mount (from search/URL)
 }
 
 const DAYS_TO_LOAD = 7 // Load 7 days at a time
@@ -30,6 +31,7 @@ export function DailyNotes({
   initialFolders,
   initialChildPages,
   initialOverdueTasks,
+  scrollToDate,
 }: DailyNotesProps) {
   const [pages, setPages] = useState(initialPages)
   const [projectedTasks, setProjectedTasks] = useState(initialProjectedTasks)
@@ -53,14 +55,19 @@ export function DailyNotes({
   const todayRef = useRef<HTMLDivElement>(null)
   const dayRefs = useRef<Map<string, HTMLDivElement>>(new Map())
   
-  // Scroll to today on mount
+  // Scroll to target date (from search) or today on mount
   useEffect(() => {
-    if (todayRef.current) {
-      setTimeout(() => {
-        todayRef.current?.scrollIntoView({ behavior: 'instant', block: 'start' })
-      }, 100)
-    }
-  }, [])
+    setTimeout(() => {
+      if (scrollToDate) {
+        const el = dayRefs.current.get(scrollToDate)
+        if (el) {
+          el.scrollIntoView({ behavior: 'instant', block: 'start' })
+          return
+        }
+      }
+      todayRef.current?.scrollIntoView({ behavior: 'instant', block: 'start' })
+    }, 100)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
   
   // Intersection Observer to detect if today is visible
   useEffect(() => {
