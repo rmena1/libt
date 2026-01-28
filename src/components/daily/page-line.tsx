@@ -832,29 +832,66 @@ export const PageLine = forwardRef<PageLineHandle, PageLineProps>(function PageL
                 
                 {/* Folder tag badge */}
                 {matchedFolder && (
-                  <Link
-                    href={`/folders/${matchedFolder.slug}`}
+                  <span
                     style={{
                       flexShrink: 0,
                       fontSize: '12px',
-                      padding: '2px 8px',
+                      padding: '2px 4px 2px 8px',
                       borderRadius: '4px',
                       color: '#007aff',
                       backgroundColor: '#eff6ff',
-                      textDecoration: 'none',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '4px',
+                      gap: '2px',
                       marginTop: '4px',
                       lineHeight: '18px',
                     }}
-                    onClick={(e) => e.stopPropagation()}
                   >
-                    <svg width="10" height="10" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
-                    </svg>
-                    {matchedFolder.name}
-                  </Link>
+                    <Link
+                      href={`/folders/${matchedFolder.slug}`}
+                      style={{
+                        color: 'inherit',
+                        textDecoration: 'none',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <svg width="10" height="10" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
+                      </svg>
+                      {matchedFolder.name}
+                    </Link>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        e.preventDefault()
+                        // Unlink page from folder
+                        onUpdate?.({
+                          ...page,
+                          folderId: null,
+                          updatedAt: new Date(),
+                        })
+                      }}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        padding: '0 2px',
+                        color: '#007aff',
+                        display: 'flex',
+                        alignItems: 'center',
+                        opacity: 0.5,
+                        borderRadius: '2px',
+                      }}
+                      title="Remove from folder"
+                    >
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </span>
                 )}
               </>
             )}

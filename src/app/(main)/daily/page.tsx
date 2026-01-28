@@ -1,4 +1,5 @@
 import { getDailyPagesRange, getProjectedTasksForRange, getChildPagesForParents } from '@/lib/actions/pages'
+import { getOverdueTasks } from '@/lib/actions/tasks'
 import { getAllFolders } from '@/lib/actions/folders'
 import { handleGoogleCallback } from '@/lib/actions/calendar'
 import { DailyNotes } from '@/components/daily/daily-notes'
@@ -19,10 +20,11 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const startDate = addDays(todayDate, -7)
   const endDate = addDays(todayDate, 7)
   
-  const [initialPages, initialProjectedTasks, initialFolders] = await Promise.all([
+  const [initialPages, initialProjectedTasks, initialFolders, initialOverdueTasks] = await Promise.all([
     getDailyPagesRange(startDate, endDate),
     getProjectedTasksForRange(startDate, endDate),
     getAllFolders(),
+    getOverdueTasks(),
   ])
   
   // Fetch child pages for all top-level pages (folder notes have children)
@@ -37,6 +39,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
       initialEndDate={endDate}
       initialFolders={initialFolders}
       initialChildPages={initialChildPages}
+      initialOverdueTasks={initialOverdueTasks}
     />
   )
 }

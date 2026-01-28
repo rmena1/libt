@@ -16,6 +16,7 @@ interface DailyNotesProps {
   initialEndDate: string
   initialFolders?: import('@/lib/db').Folder[]
   initialChildPages?: Record<string, Page[]>  // parentPageId → child pages
+  initialOverdueTasks?: Page[]  // Tasks overdue (past date, not completed)
 }
 
 const DAYS_TO_LOAD = 7 // Load 7 days at a time
@@ -28,10 +29,12 @@ export function DailyNotes({
   initialEndDate,
   initialFolders,
   initialChildPages,
+  initialOverdueTasks,
 }: DailyNotesProps) {
   const [pages, setPages] = useState(initialPages)
   const [projectedTasks, setProjectedTasks] = useState(initialProjectedTasks)
   const [childPagesMap, setChildPagesMap] = useState<Record<string, Page[]>>(initialChildPages || {})
+  const [overdueTasks, setOverdueTasks] = useState<Page[]>(initialOverdueTasks || [])
   const [startDate, setStartDate] = useState(initialStartDate)
   const [endDate, setEndDate] = useState(initialEndDate)
   const [isLoadingPast, setIsLoadingPast] = useState(false)
@@ -291,6 +294,15 @@ export function DailyNotes({
       return newProjected
     })
     
+    // Update in overdue tasks
+    setOverdueTasks(prev => {
+      if (updatedTask.taskCompleted) {
+        // Remove completed tasks from overdue
+        return prev.filter(t => t.id !== updatedTask.id)
+      }
+      return prev.map(t => t.id === updatedTask.id ? updatedTask : t)
+    })
+    
     // Also update in pages
     setPages(prev => {
       const newPages = { ...prev }
@@ -364,6 +376,7 @@ export function DailyNotes({
               date={date}
               initialPages={pages[date] || []}
               projectedTasks={projectedTasks[date] || []}
+              overdueTasks={date === todayDate ? overdueTasks : undefined}
               onTaskUpdate={handleTaskUpdate}
               allFolders={initialFolders}
               childPagesMap={childPagesMap}

@@ -22,12 +22,13 @@ interface DayCardProps {
   date: string // YYYY-MM-DD
   initialPages: Page[]
   projectedTasks?: Page[] // Tasks from other days that are due on this date
+  overdueTasks?: Page[] // Tasks past their due date, not completed (only for today)
   onTaskUpdate?: (updatedTask: Page) => void // Callback to sync task updates across days
   allFolders?: import('@/lib/db').Folder[] // For #folder-name autocomplete in page lines
   childPagesMap?: Record<string, Page[]> // parentPageId → child pages (for folder notes)
 }
 
-export function DayCard({ date, initialPages, projectedTasks = [], onTaskUpdate, allFolders, childPagesMap }: DayCardProps) {
+export function DayCard({ date, initialPages, projectedTasks = [], overdueTasks = [], onTaskUpdate, allFolders, childPagesMap }: DayCardProps) {
   // LOCAL-FIRST: Load from localStorage first, fallback to server data
   const [pages, setPages] = useState<Page[]>(() => {
     if (typeof window === 'undefined') return initialPages
@@ -35,6 +36,7 @@ export function DayCard({ date, initialPages, projectedTasks = [], onTaskUpdate,
     return local.length > 0 ? local : initialPages
   })
   const [projected, setProjected] = useState<Page[]>(projectedTasks)
+  const [overdue, setOverdue] = useState<Page[]>(overdueTasks)
   const [pendingCount, setPendingCount] = useState(0)
   const isCreatingRef = useRef(false)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -79,6 +81,11 @@ export function DayCard({ date, initialPages, projectedTasks = [], onTaskUpdate,
   useEffect(() => {
     setProjected(projectedTasks)
   }, [projectedTasks])
+  
+  // Sync overdue tasks when parent updates them
+  useEffect(() => {
+    setOverdue(overdueTasks)
+  }, [overdueTasks])
   
   // Clear focusPageId after a delay (to allow component to use it for autoFocus)
   useEffect(() => {
@@ -162,6 +169,12 @@ export function DayCard({ date, initialPages, projectedTasks = [], onTaskUpdate,
       return newPages
     })
     setProjected(prev => prev.map(p => p.id === updatedPage.id ? updatedPage : p))
+    setOverdue(prev => {
+      if (updatedPage.taskCompleted) {
+        return prev.filter(p => p.id !== updatedPage.id)
+      }
+      return prev.map(p => p.id === updatedPage.id ? updatedPage : p)
+    })
     onTaskUpdate?.(updatedPage)
     
     // Queue for server sync
@@ -344,9 +357,51 @@ export function DayCard({ date, initialPages, projectedTasks = [], onTaskUpdate,
           pages.length === 0 && 'flex items-start'
         )}
       >
-        {pages.length > 0 || projected.length > 0 ? (
+        {pages.length > 0 || projected.length > 0 || overdue.length > 0 ? (
           <div className="space-y-1">
-            {/* Projected tasks from other days - shown FIRST */}
+            {/* Overdue tasks - shown FIRST, only on today */}
+            {isTodayDate && overdue.length > 0 && (
+              <>
+                <div style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '6px',
+                  marginBottom: '4px',
+                  paddingLeft: '2px',
+                }}>
+                  <span style={{
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    color: '#dc2626',
+                  }}>
+                    Overdue
+                  </span>
+                  <span style={{
+                    fontSize: '11px',
+                    color: '#dc2626',
+                    opacity: 0.6,
+                  }}>
+                    {overdue.length}
+                  </span>
+                </div>
+                {overdue.map((task) => (
+                  <PageLine
+                    key={`overdue-${task.id}`}
+                    page={task}
+                    dailyDate={task.dailyDate || undefined}
+                    onUpdate={handleUpdatePage}
+                    isProjected={true}
+                  />
+                ))}
+                {(projected.length > 0 || pages.length > 0) && (
+                  <div className="border-t border-dashed border-red-200 my-3" />
+                )}
+              </>
+            )}
+            
+            {/* Projected tasks from other days */}
             {projected.length > 0 && (
               <>
                 {projected.map((task) => (
