@@ -2,6 +2,7 @@ import { getSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { Sidebar } from '@/components/sidebar/sidebar'
 import { BottomNav } from '@/components/navigation/bottom-nav'
+import { SearchModal } from '@/components/search/search-modal'
 import { getFolderTree } from '@/lib/actions/folders'
 import { getStarredPages } from '@/lib/actions/pages'
 
@@ -52,6 +53,7 @@ export default async function MainLayout({
       <div style={{ minHeight: '100vh', backgroundColor: 'white' }}>
         <Sidebar email={session.email} folderTree={folderTree} starredPages={starredPages} />
         <BottomNav />
+        <SearchModal />
         
         <main className="main-layout-main">
           <div className="main-layout-content">

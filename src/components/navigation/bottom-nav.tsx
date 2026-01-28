@@ -8,6 +8,7 @@ interface NavItem {
   href: string
   icon: React.ReactNode
   placeholder?: boolean
+  searchButton?: boolean
 }
 
 export function BottomNav() {
@@ -26,7 +27,7 @@ export function BottomNav() {
     {
       name: 'Search',
       href: '/search',
-      placeholder: true,
+      searchButton: true,
       icon: (
         <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
@@ -89,6 +90,34 @@ export function BottomNav() {
       {navItems.map((item) => {
         const active = isActive(item.href)
         
+        if (item.searchButton) {
+          return (
+            <button
+              key={item.href}
+              data-testid="mobile-search-button"
+              onClick={() => (window as any).__openSearch?.()}
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flex: 1,
+                height: '100%',
+                border: 'none',
+                background: 'none',
+                cursor: 'pointer',
+                color: '#6b7280',
+                transition: 'color 150ms ease',
+              }}
+            >
+              <span>{item.icon}</span>
+              <span style={{ fontSize: '10px', marginTop: '4px', fontWeight: 500, letterSpacing: '0.01em' }}>
+                {item.name}
+              </span>
+            </button>
+          )
+        }
+
         if (item.placeholder) {
           return (
             <button

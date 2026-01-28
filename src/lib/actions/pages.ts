@@ -1,7 +1,7 @@
 'use server'
 
 import { db, pages, type Page } from '@/lib/db'
-import { eq, and, asc, isNull, ne, inArray, gte } from 'drizzle-orm'
+import { eq, and, asc, desc, isNull, ne, inArray, gte, like, sql } from 'drizzle-orm'
 import { requireAuth } from '@/lib/auth'
 import { createPageSchema, updatePageSchema, type CreatePageInput, type UpdatePageInput } from '@/lib/validations'
 import { generateId } from '@/lib/utils'
@@ -505,4 +505,44 @@ export async function getStarredPages(): Promise<StarredPageWithFolder[]> {
     ...r.page,
     folderSlug: r.folderSlug,
   }))
+}
+
+// ============================================================================
+// SEARCH
+// ============================================================================
+
+export interface SearchResult {
+  id: string
+  content: string
+  dailyDate: string | null
+}
+
+/**
+ * Search pages by content (case-insensitive LIKE)
+ */
+export async function searchPages(query: string): Promise<SearchResult[]> {
+  const session = await requireAuth()
+
+  if (!query || query.trim().length === 0) return []
+
+  const trimmed = query.trim()
+  const pattern = `%${trimmed}%`
+
+  const result = await db
+    .select({
+      id: pages.id,
+      content: pages.content,
+      dailyDate: pages.dailyDate,
+    })
+    .from(pages)
+    .where(
+      and(
+        eq(pages.userId, session.id),
+        sql`lower(${pages.content}) LIKE lower(${pattern})`
+      )
+    )
+    .orderBy(desc(pages.dailyDate))
+    .limit(15)
+
+  return result
 }
