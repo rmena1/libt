@@ -7,7 +7,9 @@ export const users = sqliteTable('users', {
   id: text('id').primaryKey(), // nanoid
   email: text('email').notNull().unique(),
   passwordHash: text('password_hash').notNull(),
-  icalUrl: text('ical_url'), // Google Calendar iCal URL
+  googleRefreshToken: text('google_refresh_token'),
+  googleAccessToken: text('google_access_token'),
+  googleTokenExpiry: integer('google_token_expiry'), // unix timestamp in seconds
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
 })

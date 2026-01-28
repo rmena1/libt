@@ -41,10 +41,10 @@ export function CalendarTimeline({ currentDate, onSettingsClick }: CalendarTimel
     fetchEvents()
   }, [fetchEvents])
 
-  // Check if URL is configured (empty result with no error means configured but no events)
+  // Check if Google Calendar is connected
   useEffect(() => {
-    import('@/lib/actions/calendar').then(mod => mod.getIcalUrl()).then(url => {
-      setHasUrl(!!url)
+    import('@/lib/actions/calendar').then(mod => mod.isGoogleConnected()).then(connected => {
+      setHasUrl(connected)
     }).catch(() => setHasUrl(false))
   }, [])
 
