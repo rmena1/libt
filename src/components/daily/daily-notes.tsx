@@ -324,6 +324,7 @@ export function DailyNotes({
   return (
     <div
       ref={containerRef}
+      className="daily-notes-container"
       style={{ height: '100vh', overflowY: 'auto', backgroundColor: 'white', width: '100%' }}
     >
       {/* Mini Calendar - Desktop */}

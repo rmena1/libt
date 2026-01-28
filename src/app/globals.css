@@ -48,6 +48,13 @@ body {
   background: #d4d4d4;
 }
 
+/* Right sidebar spacing for daily notes on desktop */
+@media (min-width: 768px) {
+  .daily-notes-container {
+    padding-right: 220px;
+  }
+}
+
 /* Hide scrollbar for mobile timeline */
 .no-scrollbar::-webkit-scrollbar {
   display: none;
