@@ -2,67 +2,60 @@
 
 ## Phase 1: Foundation ✅ COMPLETE
 
-### Setup
-- [x] Create Next.js 15 project with TypeScript
-- [x] Configure Tailwind CSS
-- [x] Configure ESLint
-- [x] Set up project structure (folders, aliases)
-
-### Database
-- [x] Install and configure Drizzle ORM
-- [x] Set up SQLite with better-sqlite3
-- [x] Create database schema (users, folders, pages, sessions)
-- [x] Create migrations (using drizzle push)
-- [ ] Add seed script for development (optional)
-
-### Authentication
-- [x] Implement password hashing (bcrypt)
-- [x] Create session management (HTTP-only cookies)
-- [x] Register endpoint
-- [x] Login endpoint
-- [x] Logout endpoint
-- [x] Auth middleware for protected routes
-- [ ] CSRF protection (TODO: add later)
-
-### Layout & Navigation
-- [x] Create root layout with sidebar
-- [x] Responsive sidebar (collapsible on mobile)
-- [x] Navigation items (Daily Notes, Tasks, Folders)
-- [x] User menu (logout)
-
-### Daily Notes View
-- [x] Infinite scroll component (past & future)
-- [x] Day card component
-- [x] Page/line editor component
-- [ ] Nested content (indentation) - structure ready, UI pending
-- [x] Auto-save with debounce (500ms)
-- [x] Optimistic updates
-- [x] Loading states
-- [ ] Error handling (basic, needs toast)
+- [x] Next.js 15 + TypeScript + Tailwind
+- [x] Drizzle ORM + SQLite
+- [x] Auth (register, login, logout, sessions)
+- [x] Daily Notes con infinite scroll
+- [x] Auto-save con debounce
+- [x] Indentación (Tab/Shift+Tab)
+- [x] Mobile toolbar para indent
+- [x] Toasts de error
+- [x] Bottom nav mobile (Home, Search, Tasks, New)
+- [x] Sidebar desktop colapsable
+- [x] Timezone Chile (America/Santiago)
+- [x] Botón "Today" flotante
 
 ---
 
-## Phase 2: Tasks & Folders (Next)
-- [ ] Task parsing (`[]` syntax)
-- [ ] Date parsing (`@` syntax)
-- [ ] Priority parsing (`!` syntax)
-- [ ] Tasks sidebar view
-- [ ] Folder parsing (`#` syntax)
-- [ ] Folder sidebar
+## Phase 2: Tasks & Folders 🎯 IN PROGRESS
+
+### Tasks ✅ PARCIAL
+- [x] `[]` → checkbox
+- [x] Click toggle (completar/descompletar)
+- [x] Estilo completado (~~tachado~~ + gris)
+- [ ] `@fecha` → parsear `@today`, `@tomorrow`, `@2026-01-30`
+- [ ] `!` prioridad → `!` baja, `!!` media, `!!!` alta
+- [ ] **Vista Tasks** → página/tab con todas las tareas
+
+### Folders
+- [ ] `#folder` → asignar nota a folder
+- [ ] Auto-crear folders
+- [ ] **Vista Folders** → sidebar con lista de folders
+- [ ] Filtrar notas por folder
+
+---
 
 ## Phase 3: Polish
-- [ ] `Cmd+K` search
-- [ ] Keyboard navigation
-- [ ] Mobile optimization
-- [ ] Performance audit
+
+### Search & Navigation
+- [ ] `Cmd+K` búsqueda global
+- [ ] Navegación con teclado
+- [ ] Saltar a fecha específica
+
+### Performance & Deploy
+- [ ] Production build
+- [ ] Deploy (Vercel/Railway)
+- [ ] Custom domain
+- [ ] PWA / Offline support
 
 ---
 
-## Current Focus
-> Setup: Creating Next.js project with proper configuration
-
-## Notes
-- Mobile-first design
-- Minimal, clean UI (Craft-inspired)
-- White background, black text
-- Few buttons, focus on content
+## Completado hoy (2026-01-25)
+- ✅ UI fixes (bullets, Today pill, márgenes)
+- ✅ Toasts
+- ✅ Indentación + mobile toolbar
+- ✅ Bottom nav estilo Notion
+- ✅ Checkboxes con `[]`
+- ✅ Toggle + estilo tachado
+- ✅ Timezone Chile
+- ✅ Botón "Today" flotante

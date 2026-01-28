@@ -20,15 +20,18 @@ export const loginSchema = z.object({
 // PAGE SCHEMAS
 // ============================================================================
 export const createPageSchema = z.object({
+  id: z.string().nullish(), // Allow client-generated ID for local-first
   content: z.string().default(''),
-  dailyDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  folderId: z.string().optional(),
-  parentPageId: z.string().optional(),
+  indent: z.number().int().min(0).max(4).default(0),
+  dailyDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullish(),
+  folderId: z.string().nullish(),
+  parentPageId: z.string().nullish(),
   order: z.number().int().default(0),
 })
 
 export const updatePageSchema = z.object({
   content: z.string().optional(),
+  indent: z.number().int().min(0).max(4).optional(),
   folderId: z.string().nullable().optional(),
   parentPageId: z.string().nullable().optional(),
   order: z.number().int().optional(),
@@ -36,6 +39,7 @@ export const updatePageSchema = z.object({
   taskCompleted: z.boolean().optional(),
   taskDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
   taskPriority: z.enum(['low', 'medium', 'high']).nullable().optional(),
+  starred: z.boolean().optional(),
 })
 
 // ============================================================================

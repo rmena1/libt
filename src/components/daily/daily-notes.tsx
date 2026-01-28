@@ -2,14 +2,18 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { type Page } from '@/lib/db'
-import { getDailyPagesRange } from '@/lib/actions/pages'
+import { getDailyPagesRange, getProjectedTasksForRange, getChildPagesForParents } from '@/lib/actions/pages'
 import { DayCard } from './day-card'
+import { MobileAddBubble, MobileFAB } from './mobile-add-bubble'
 import { today, addDays } from '@/lib/utils'
 
 interface DailyNotesProps {
   initialPages: Record<string, Page[]>
+  initialProjectedTasks: Record<string, Page[]>
   initialStartDate: string
   initialEndDate: string
+  initialFolders?: import('@/lib/db').Folder[]
+  initialChildPages?: Record<string, Page[]>  // parentPageId → child pages
 }
 
 const DAYS_TO_LOAD = 7 // Load 7 days at a time
@@ -17,14 +21,25 @@ const SCROLL_THRESHOLD = 300 // px from edge to trigger load
 
 export function DailyNotes({
   initialPages,
+  initialProjectedTasks,
   initialStartDate,
   initialEndDate,
+  initialFolders,
+  initialChildPages,
 }: DailyNotesProps) {
   const [pages, setPages] = useState(initialPages)
+  const [projectedTasks, setProjectedTasks] = useState(initialProjectedTasks)
+  const [childPagesMap, setChildPagesMap] = useState<Record<string, Page[]>>(initialChildPages || {})
   const [startDate, setStartDate] = useState(initialStartDate)
   const [endDate, setEndDate] = useState(initialEndDate)
   const [isLoadingPast, setIsLoadingPast] = useState(false)
   const [isLoadingFuture, setIsLoadingFuture] = useState(false)
+  
+  // Scroll to Today button state
+  const [isTodayVisible, setIsTodayVisible] = useState(true)
+  
+  // Mobile add bubble state
+  const [isAddBubbleOpen, setIsAddBubbleOpen] = useState(false)
   
   const containerRef = useRef<HTMLDivElement>(null)
   const todayRef = useRef<HTMLDivElement>(null)
@@ -38,6 +53,31 @@ export function DailyNotes({
     }
   }, [])
   
+  // Intersection Observer to detect if today is visible
+  useEffect(() => {
+    const todayElement = todayRef.current
+    const container = containerRef.current
+    if (!todayElement || !container) return
+    
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setIsTodayVisible(entry.isIntersecting)
+      },
+      { 
+        root: container,
+        threshold: 0.1 
+      }
+    )
+    
+    observer.observe(todayElement)
+    return () => observer.disconnect()
+  }, [])
+  
+  // Scroll to today handler
+  const scrollToToday = useCallback(() => {
+    todayRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [])
+  
   // Load more days in the past
   const loadPast = useCallback(async () => {
     if (isLoadingPast) return
@@ -47,9 +87,20 @@ export function DailyNotes({
       const newStartDate = addDays(startDate, -DAYS_TO_LOAD)
       const newEndDate = addDays(startDate, -1)
       
-      const newPages = await getDailyPagesRange(newStartDate, newEndDate)
+      const [newPages, newProjected] = await Promise.all([
+        getDailyPagesRange(newStartDate, newEndDate),
+        getProjectedTasksForRange(newStartDate, newEndDate),
+      ])
+      
+      // Fetch child pages for newly loaded pages
+      const newPageIds = Object.values(newPages).flat().map(p => p.id)
+      if (newPageIds.length > 0) {
+        const newChildren = await getChildPagesForParents(newPageIds)
+        setChildPagesMap(prev => ({ ...newChildren, ...prev }))
+      }
       
       setPages(prev => ({ ...newPages, ...prev }))
+      setProjectedTasks(prev => ({ ...newProjected, ...prev }))
       setStartDate(newStartDate)
     } catch (error) {
       console.error('Failed to load past:', error)
@@ -67,9 +118,20 @@ export function DailyNotes({
       const newStartDate = addDays(endDate, 1)
       const newEndDate = addDays(endDate, DAYS_TO_LOAD)
       
-      const newPages = await getDailyPagesRange(newStartDate, newEndDate)
+      const [newPages, newProjected] = await Promise.all([
+        getDailyPagesRange(newStartDate, newEndDate),
+        getProjectedTasksForRange(newStartDate, newEndDate),
+      ])
+      
+      // Fetch child pages for newly loaded pages
+      const newPageIds = Object.values(newPages).flat().map(p => p.id)
+      if (newPageIds.length > 0) {
+        const newChildren = await getChildPagesForParents(newPageIds)
+        setChildPagesMap(prev => ({ ...prev, ...newChildren }))
+      }
       
       setPages(prev => ({ ...prev, ...newPages }))
+      setProjectedTasks(prev => ({ ...prev, ...newProjected }))
       setEndDate(newEndDate)
     } catch (error) {
       console.error('Failed to load future:', error)
@@ -111,20 +173,73 @@ export function DailyNotes({
   
   const todayDate = today()
   
+  // Callback when a task is updated (toggle, save with new @date)
+  // Syncs the update across all days in both pages and projectedTasks
+  const handleTaskUpdate = useCallback((updatedTask: Page) => {
+    // Update in projectedTasks
+    setProjectedTasks(prev => {
+      const newProjected = { ...prev }
+      // Update the task in all days where it already appears
+      for (const [date, tasks] of Object.entries(newProjected)) {
+        newProjected[date] = tasks.map(t => t.id === updatedTask.id ? updatedTask : t)
+      }
+      // If task has a taskDate different from dailyDate, ensure it appears in that day
+      if (updatedTask.taskDate && updatedTask.taskDate !== updatedTask.dailyDate) {
+        if (!newProjected[updatedTask.taskDate]) {
+          newProjected[updatedTask.taskDate] = []
+        }
+        const exists = newProjected[updatedTask.taskDate].find(t => t.id === updatedTask.id)
+        if (!exists) {
+          newProjected[updatedTask.taskDate] = [...newProjected[updatedTask.taskDate], updatedTask]
+        }
+      }
+      return newProjected
+    })
+    
+    // Also update in pages
+    setPages(prev => {
+      const newPages = { ...prev }
+      for (const [date, pageList] of Object.entries(newPages)) {
+        newPages[date] = pageList.map(p => p.id === updatedTask.id ? updatedTask : p)
+      }
+      return newPages
+    })
+  }, [])
+  
+  // Refresh pages after adding from mobile bubble
+  const handlePageCreated = useCallback(async () => {
+    // Small delay to ensure DB write is complete
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // Refresh today's and potentially the target date's pages
+    try {
+      const [newPages, newProjected, newChildren] = await Promise.all([
+        getDailyPagesRange(startDate, endDate),
+        getProjectedTasksForRange(startDate, endDate),
+        getChildPagesForParents(Object.values(pages).flat().map(p => p.id)),
+      ])
+      setPages(newPages)
+      setProjectedTasks(newProjected)
+      setChildPagesMap(prev => ({ ...prev, ...newChildren }))
+    } catch (error) {
+      console.error('Failed to refresh pages:', error)
+    }
+  }, [startDate, endDate, pages])
+  
   return (
     <div
       ref={containerRef}
-      className="h-screen overflow-y-auto bg-white px-2 md:px-4"
+      style={{ height: '100vh', overflowY: 'auto', backgroundColor: 'white', width: '100%' }}
     >
       {/* Loading indicator - past */}
       {isLoadingPast && (
-        <div className="py-6 text-center">
-          <span className="text-sm text-gray-400">Loading...</span>
+        <div style={{ padding: '24px 0', textAlign: 'center' }}>
+          <span style={{ fontSize: '14px', color: '#9ca3af' }}>Loading...</span>
         </div>
       )}
       
       {/* Days */}
-      <div className="mx-auto max-w-2xl">
+      <div style={{ maxWidth: '720px', margin: '0 auto', padding: '0 20px' }}>
         {dates.map((date) => (
           <div
             key={date}
@@ -133,6 +248,10 @@ export function DailyNotes({
             <DayCard
               date={date}
               initialPages={pages[date] || []}
+              projectedTasks={projectedTasks[date] || []}
+              onTaskUpdate={handleTaskUpdate}
+              allFolders={initialFolders}
+              childPagesMap={childPagesMap}
             />
           </div>
         ))}
@@ -140,13 +259,51 @@ export function DailyNotes({
       
       {/* Loading indicator - future */}
       {isLoadingFuture && (
-        <div className="py-6 text-center">
-          <span className="text-sm text-gray-400">Loading...</span>
+        <div style={{ padding: '24px 0', textAlign: 'center' }}>
+          <span style={{ fontSize: '14px', color: '#9ca3af' }}>Loading...</span>
         </div>
       )}
       
       {/* Bottom padding for scroll */}
       <div className="h-40" />
+      
+      {/* Scroll to Today floating button */}
+      <button
+        onClick={scrollToToday}
+        style={{
+          position: 'fixed',
+          bottom: '100px',
+          left: '50%',
+          transform: `translateX(-50%) scale(${isTodayVisible ? 0.9 : 1})`,
+          backgroundColor: '#111827',
+          color: 'white',
+          padding: '10px 20px',
+          borderRadius: '20px',
+          fontSize: '14px',
+          fontWeight: 500,
+          cursor: 'pointer',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+          zIndex: 50,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          border: 'none',
+          opacity: isTodayVisible ? 0 : 1,
+          transition: 'opacity 0.2s ease, transform 0.2s ease',
+          pointerEvents: isTodayVisible ? 'none' : 'auto',
+        }}
+        aria-label="Scroll to today"
+      >
+        Today
+      </button>
+      
+      {/* Mobile FAB and Add Bubble */}
+      <MobileFAB onClick={() => setIsAddBubbleOpen(true)} />
+      <MobileAddBubble 
+        isOpen={isAddBubbleOpen} 
+        onClose={() => setIsAddBubbleOpen(false)}
+        onPageCreated={handlePageCreated}
+      />
     </div>
   )
 }

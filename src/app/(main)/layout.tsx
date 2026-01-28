@@ -1,6 +1,9 @@
 import { getSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { Sidebar } from '@/components/sidebar/sidebar'
+import { BottomNav } from '@/components/navigation/bottom-nav'
+import { getFolderTree } from '@/lib/actions/folders'
+import { getStarredPages } from '@/lib/actions/pages'
 
 export default async function MainLayout({
   children,
@@ -13,19 +16,49 @@ export default async function MainLayout({
     redirect('/login')
   }
   
+  // Load folder tree and starred pages for sidebar
+  let folderTree: any[]
+  let starredPages: any[]
+  try {
+    folderTree = await getFolderTree()
+  } catch {
+    folderTree = []
+  }
+  try {
+    starredPages = await getStarredPages()
+  } catch {
+    starredPages = []
+  }
+  
   return (
-    <div className="min-h-screen bg-white">
-      <Sidebar email={session.email} />
-      
-      {/* Main content */}
-      <main className="lg:pl-64">
-        {/* Mobile header spacer */}
-        <div className="h-14 lg:h-0" />
+    <>
+      <style>{`
+        .main-layout-content {
+          min-height: 100vh;
+          padding-bottom: 60px;
+        }
+        .main-layout-main {
+          min-height: 100vh;
+        }
+        @media (min-width: 768px) {
+          .main-layout-main {
+            padding-left: 256px;
+          }
+          .main-layout-content {
+            padding-bottom: 0;
+          }
+        }
+      `}</style>
+      <div style={{ minHeight: '100vh', backgroundColor: 'white' }}>
+        <Sidebar email={session.email} folderTree={folderTree} starredPages={starredPages} />
+        <BottomNav />
         
-        <div className="min-h-[calc(100vh-3.5rem)] lg:min-h-screen">
-          {children}
-        </div>
-      </main>
-    </div>
+        <main className="main-layout-main">
+          <div className="main-layout-content">
+            {children}
+          </div>
+        </main>
+      </div>
+    </>
   )
 }

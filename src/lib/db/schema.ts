@@ -51,6 +51,7 @@ export const pages = sqliteTable('pages', {
   
   // Content
   content: text('content').notNull().default(''),
+  indent: integer('indent').notNull().default(0), // Indentation level (0-4)
   
   // Hierarchy
   dailyDate: text('daily_date'), // YYYY-MM-DD if part of daily note
@@ -65,6 +66,9 @@ export const pages = sqliteTable('pages', {
   taskDate: text('task_date'), // YYYY-MM-DD for task due date
   taskPriority: text('task_priority', { enum: ['low', 'medium', 'high'] }),
   
+  // Starred (favorites)
+  starred: integer('starred', { mode: 'boolean' }).notNull().default(false),
+  
   // Timestamps
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
@@ -73,6 +77,7 @@ export const pages = sqliteTable('pages', {
   index('idx_pages_user_folder').on(table.userId, table.folderId),
   index('idx_pages_parent').on(table.parentPageId),
   index('idx_pages_tasks').on(table.userId, table.isTask, table.taskDate),
+  index('idx_pages_starred').on(table.userId, table.starred),
 ])
 
 // ============================================================================
