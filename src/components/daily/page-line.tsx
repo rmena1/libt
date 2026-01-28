@@ -733,146 +733,198 @@ export const PageLine = forwardRef<PageLineHandle, PageLineProps>(function PageL
       
       {/* Content */}
       <div className="flex-1 min-w-0 relative">
-        <div className="flex items-start gap-2">
-          {/* Priority badge */}
-          {taskInfo.isTask && priorityInfo && !isTaskCompleted && (
-            <span 
-              className="flex-shrink-0 text-xs font-semibold px-1 py-0.5 rounded mt-1"
-              style={{ 
-                color: priorityInfo.color, 
-                backgroundColor: priorityInfo.bgColor,
-              }}
-            >
-              {priorityInfo.label}
-            </span>
-          )}
-          
-          {/* Textarea */}
-          <div className="flex-1 min-w-0" style={{ position: 'relative' }}>
-            <textarea
-              ref={inputRef}
-              value={taskInfo.isTask ? taskInfo.textContent : content}
-              onChange={handleChange}
-              onKeyDown={handleKeyDown}
-              onFocus={handleFocus}
-              onBlur={handleBlur}
-              onTouchEnd={handleTouchEnd}
-              placeholder={placeholder}
-              rows={1}
-              className={cn(
-                'w-full resize-none overflow-hidden bg-transparent py-0.5 pr-16',
-                'placeholder:text-gray-300',
-                'focus:outline-none',
-                'selection:bg-gray-200',
-                // Title styles (root pages with children)
-                isTitle ? 'text-lg leading-8 font-semibold' : 'text-base leading-7',
-                // Task completed styles
-                taskInfo.isTask && isTaskCompleted 
-                  ? 'text-gray-400 line-through' 
-                  : taskIsOverdue 
-                    ? 'text-red-700'
-                    : 'text-gray-900'
-              )}
-            />
+        <div className={cn(
+          "flex gap-2",
+          isProjected ? "flex-col md:flex-row md:items-start" : "items-start"
+        )}>
+          {/* Main content row */}
+          <div className="flex items-start gap-2 flex-1 min-w-0">
+            {/* Priority badge */}
+            {taskInfo.isTask && priorityInfo && !isTaskCompleted && (
+              <span 
+                className="flex-shrink-0 text-xs font-semibold px-1 py-0.5 rounded mt-1"
+                style={{ 
+                  color: priorityInfo.color, 
+                  backgroundColor: priorityInfo.bgColor,
+                }}
+              >
+                {priorityInfo.label}
+              </span>
+            )}
             
-            {/* Folder autocomplete dropdown */}
-            {showAutocomplete && filteredFolders.length > 0 && (
-              <FolderAutocomplete
-                query={autocompleteQuery}
-                folders={allFolders || []}
-                selectedIndex={selectedAutocompleteIndex}
-                onSelect={handleFolderSelect}
+            {/* Textarea */}
+            <div className="flex-1 min-w-0" style={{ position: 'relative' }}>
+              <textarea
+                ref={inputRef}
+                value={taskInfo.isTask ? taskInfo.textContent : content}
+                onChange={handleChange}
+                onKeyDown={handleKeyDown}
+                onFocus={handleFocus}
+                onBlur={handleBlur}
+                onTouchEnd={handleTouchEnd}
+                placeholder={placeholder}
+                rows={1}
+                className={cn(
+                  'w-full resize-none overflow-hidden bg-transparent py-0.5 pr-16',
+                  'placeholder:text-gray-300',
+                  'focus:outline-none',
+                  'selection:bg-gray-200',
+                  // Title styles (root pages with children)
+                  isTitle ? 'text-lg leading-8 font-semibold' : 'text-base leading-7',
+                  // Task completed styles
+                  taskInfo.isTask && isTaskCompleted 
+                    ? 'text-gray-400 line-through' 
+                    : taskIsOverdue 
+                      ? 'text-red-700'
+                      : 'text-gray-900'
+                )}
               />
+              
+              {/* Folder autocomplete dropdown */}
+              {showAutocomplete && filteredFolders.length > 0 && (
+                <FolderAutocomplete
+                  query={autocompleteQuery}
+                  folders={allFolders || []}
+                  selectedIndex={selectedAutocompleteIndex}
+                  onSelect={handleFolderSelect}
+                />
+              )}
+            </div>
+            
+            {/* Non-projected badges stay inline */}
+            {!isProjected && (
+              <>
+                {/* Date badge */}
+                {taskInfo.isTask && dateInfo?.displayText && !isTaskCompleted && (
+                  <span 
+                    className="flex-shrink-0 text-xs px-1.5 py-0.5 rounded mt-1"
+                    style={{ 
+                      color: taskIsOverdue ? '#dc2626' : taskIsDueToday ? '#2563eb' : '#6b7280',
+                      backgroundColor: taskIsOverdue ? '#fef2f2' : taskIsDueToday ? '#eff6ff' : '#f3f4f6',
+                    }}
+                  >
+                    {dateInfo.displayText}
+                  </span>
+                )}
+                
+                {/* Star button - inline with other badges */}
+                <button
+                  onClick={handleStarToggle}
+                  className={cn(
+                    "flex-shrink-0 p-1 rounded transition-all mt-0.5",
+                    isStarred 
+                      ? "text-yellow-500 opacity-100" 
+                      : "text-gray-300 opacity-0 group-hover:opacity-100 hover:text-yellow-500"
+                  )}
+                  title={isStarred ? "Remove from starred" : "Add to starred"}
+                >
+                  <svg 
+                    width="14" 
+                    height="14" 
+                    viewBox="0 0 24 24" 
+                    fill={isStarred ? "currentColor" : "none"}
+                    stroke="currentColor" 
+                    strokeWidth="2"
+                  >
+                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                  </svg>
+                </button>
+                
+                {/* Folder tag badge */}
+                {matchedFolder && (
+                  <Link
+                    href={`/folders/${matchedFolder.slug}`}
+                    style={{
+                      flexShrink: 0,
+                      fontSize: '12px',
+                      padding: '2px 8px',
+                      borderRadius: '4px',
+                      color: '#007aff',
+                      backgroundColor: '#eff6ff',
+                      textDecoration: 'none',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      marginTop: '4px',
+                      lineHeight: '18px',
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <svg width="10" height="10" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
+                    </svg>
+                    {matchedFolder.name}
+                  </Link>
+                )}
+              </>
             )}
           </div>
           
-          {/* Date badge */}
-          {taskInfo.isTask && dateInfo?.displayText && !isTaskCompleted && (
-            <span 
-              className="flex-shrink-0 text-xs px-1.5 py-0.5 rounded mt-1"
-              style={{ 
-                color: taskIsOverdue ? '#dc2626' : taskIsDueToday ? '#2563eb' : '#6b7280',
-                backgroundColor: taskIsOverdue ? '#fef2f2' : taskIsDueToday ? '#eff6ff' : '#f3f4f6',
-              }}
-            >
-              {dateInfo.displayText}
-            </span>
-          )}
-          
-          {/* Star button - inline with other badges */}
-          <button
-            onClick={handleStarToggle}
-            className={cn(
-              "flex-shrink-0 p-1 rounded transition-all mt-0.5",
-              isStarred 
-                ? "text-yellow-500 opacity-100" 
-                : "text-gray-300 opacity-0 group-hover:opacity-100 hover:text-yellow-500"
-            )}
-            title={isStarred ? "Remove from starred" : "Add to starred"}
-          >
-            <svg 
-              width="14" 
-              height="14" 
-              viewBox="0 0 24 24" 
-              fill={isStarred ? "currentColor" : "none"}
-              stroke="currentColor" 
-              strokeWidth="2"
-            >
-              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-            </svg>
-          </button>
-          
-          {/* Folder tag badge */}
-          {matchedFolder && !isProjected && (
-            <Link
-              href={`/folders/${matchedFolder.slug}`}
-              style={{
-                flexShrink: 0,
-                fontSize: '12px',
-                padding: '2px 8px',
-                borderRadius: '4px',
-                color: '#007aff',
-                backgroundColor: '#eff6ff',
-                textDecoration: 'none',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                marginTop: '4px',
-                lineHeight: '18px',
-              }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <svg width="10" height="10" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
-              </svg>
-              {matchedFolder.name}
-            </Link>
-          )}
-          
-          {/* Source indicator for projected tasks */}
-          {isProjected && sourceDate && (
-            <span 
-              className="flex-shrink-0 text-xs px-1.5 py-0.5 rounded mt-1 flex items-center gap-1"
-              style={{ 
-                color: '#6366f1',
-                backgroundColor: '#eef2ff',
-              }}
-            >
-              <svg 
-                width="10" 
-                height="10" 
-                viewBox="0 0 24 24" 
-                fill="none" 
-                stroke="currentColor" 
-                strokeWidth="2" 
-                strokeLinecap="round" 
-                strokeLinejoin="round"
+          {/* Projected task badges - stacked vertically on mobile */}
+          {isProjected && (
+            <div className="flex flex-wrap gap-1.5 md:flex-nowrap md:items-start">
+              {/* Date badge */}
+              {taskInfo.isTask && dateInfo?.displayText && !isTaskCompleted && (
+                <span 
+                  className="flex-shrink-0 text-xs px-1.5 py-0.5 rounded"
+                  style={{ 
+                    color: taskIsOverdue ? '#dc2626' : taskIsDueToday ? '#2563eb' : '#6b7280',
+                    backgroundColor: taskIsOverdue ? '#fef2f2' : taskIsDueToday ? '#eff6ff' : '#f3f4f6',
+                  }}
+                >
+                  {dateInfo.displayText}
+                </span>
+              )}
+              
+              {/* Source indicator for projected tasks */}
+              {sourceDate && (
+                <span 
+                  className="flex-shrink-0 text-xs px-1.5 py-0.5 rounded flex items-center gap-1"
+                  style={{ 
+                    color: '#6366f1',
+                    backgroundColor: '#eef2ff',
+                  }}
+                >
+                  <svg 
+                    width="10" 
+                    height="10" 
+                    viewBox="0 0 24 24" 
+                    fill="none" 
+                    stroke="currentColor" 
+                    strokeWidth="2" 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round"
+                  >
+                    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+                  </svg>
+                  from {sourceDate.split(',')[0]}
+                </span>
+              )}
+              
+              {/* Star button */}
+              <button
+                onClick={handleStarToggle}
+                className={cn(
+                  "flex-shrink-0 p-1 rounded transition-all",
+                  isStarred 
+                    ? "text-yellow-500 opacity-100" 
+                    : "text-gray-300 opacity-0 group-hover:opacity-100 hover:text-yellow-500"
+                )}
+                title={isStarred ? "Remove from starred" : "Add to starred"}
               >
-                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-              </svg>
-              from {sourceDate.split(',')[0]}
-            </span>
+                <svg 
+                  width="14" 
+                  height="14" 
+                  viewBox="0 0 24 24" 
+                  fill={isStarred ? "currentColor" : "none"}
+                  stroke="currentColor" 
+                  strokeWidth="2"
+                >
+                  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                </svg>
+              </button>
+            </div>
           )}
         </div>
         

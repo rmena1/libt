@@ -310,7 +310,7 @@ export function DayCard({ date, initialPages, projectedTasks = [], onTaskUpdate,
       {/* Date header */}
       <div style={{ marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '12px' }}>
         <h2 className={cn(
-          'text-sm font-medium tracking-wide',
+          'text-base md:text-lg font-medium tracking-wide',
           isTodayDate ? 'text-gray-900' : 'text-gray-400'
         )}>
           {formatDateDisplay(date)}
