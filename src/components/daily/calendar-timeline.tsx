@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { type CalendarEvent } from '@/lib/actions/calendar'
 import { getCalendarEvents } from '@/lib/actions/calendar'
 
@@ -73,7 +73,7 @@ export function CalendarTimeline({ currentDate, onSettingsClick }: CalendarTimel
   const allDayEvents = events.filter(e => e.allDay)
 
   return (
-    <div className="mt-3 border-t border-gray-100 pt-2">
+    <div className="mt-6 border-t border-gray-100 pt-3">
       {/* Header */}
       <div className="flex items-center justify-between px-1 mb-1">
         <span className="text-[10px] font-medium text-gray-400 uppercase tracking-wider">Events</span>
@@ -102,7 +102,31 @@ export function CalendarTimeline({ currentDate, onSettingsClick }: CalendarTimel
 
       {/* Timeline */}
       {timedEvents.length > 0 && (
-        <div className="relative overflow-y-auto max-h-[280px] scrollbar-thin" style={{ scrollbarWidth: 'thin' }}>
+        <TimelineGrid timedEvents={timedEvents} />
+      )}
+    </div>
+  )
+}
+
+function TimelineGrid({ timedEvents }: { timedEvents: CalendarEvent[] }) {
+  const scrollRef = useRef<HTMLDivElement>(null)
+  
+  useEffect(() => {
+    // Auto-scroll to current time
+    if (scrollRef.current) {
+      const now = new Date()
+      const hour = now.getHours() + now.getMinutes() / 60
+      if (hour >= START_HOUR && hour <= END_HOUR) {
+        const top = (hour - START_HOUR) * HOUR_HEIGHT
+        // Center the current time in the visible area
+        const containerHeight = scrollRef.current.clientHeight
+        scrollRef.current.scrollTop = Math.max(0, top - containerHeight / 2)
+      }
+    }
+  }, [])
+  
+  return (
+        <div ref={scrollRef} className="relative overflow-y-auto max-h-[280px] scrollbar-thin" style={{ scrollbarWidth: 'thin' }}>
           <div className="relative" style={{ height: `${TOTAL_HOURS * HOUR_HEIGHT}px` }}>
             {/* Hour lines */}
             {Array.from({ length: TOTAL_HOURS + 1 }, (_, i) => {
@@ -161,8 +185,6 @@ export function CalendarTimeline({ currentDate, onSettingsClick }: CalendarTimel
             <CurrentTimeIndicator />
           </div>
         </div>
-      )}
-    </div>
   )
 }
 
