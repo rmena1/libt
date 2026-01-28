@@ -2,6 +2,8 @@
 
 import { useState, useMemo } from 'react'
 import { cn, today } from '@/lib/utils'
+import { CalendarTimeline } from './calendar-timeline'
+import { CalendarSettings } from './calendar-settings'
 
 interface MiniCalendarProps {
   currentDate: string // YYYY-MM-DD the user is viewing
@@ -49,6 +51,7 @@ const MONTH_NAMES = [
 
 export function MiniCalendar({ currentDate, datesWithNotes, onDateSelect }: MiniCalendarProps) {
   const todayStr = today()
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const [viewYear, viewMonth] = useMemo(() => {
     const [y, m] = currentDate.split('-').map(Number)
     return [y, m - 1]
@@ -124,6 +127,18 @@ export function MiniCalendar({ currentDate, datesWithNotes, onDateSelect }: Mini
           })}
         </div>
       ))}
+
+      {/* Calendar Timeline */}
+      <CalendarTimeline
+        currentDate={currentDate}
+        onSettingsClick={() => setSettingsOpen(true)}
+      />
+
+      {/* Settings Modal */}
+      <CalendarSettings
+        isOpen={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+      />
     </div>
   )
 }
