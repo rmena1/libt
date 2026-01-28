@@ -1,10 +1,12 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { type Page } from '@/lib/db'
 import { getDailyPagesRange, getProjectedTasksForRange, getChildPagesForParents } from '@/lib/actions/pages'
 import { DayCard } from './day-card'
 import { MobileAddBubble, MobileFAB } from './mobile-add-bubble'
+import { MiniCalendar } from './mini-calendar'
+import { MobileTimeline } from './mobile-timeline'
 import { today, addDays } from '@/lib/utils'
 
 interface DailyNotesProps {
@@ -38,11 +40,15 @@ export function DailyNotes({
   // Scroll to Today button state
   const [isTodayVisible, setIsTodayVisible] = useState(true)
   
+  // Current date being viewed (for calendar navigation)
+  const [currentViewDate, setCurrentViewDate] = useState(today())
+  
   // Mobile add bubble state
   const [isAddBubbleOpen, setIsAddBubbleOpen] = useState(false)
   
   const containerRef = useRef<HTMLDivElement>(null)
   const todayRef = useRef<HTMLDivElement>(null)
+  const dayRefs = useRef<Map<string, HTMLDivElement>>(new Map())
   
   // Scroll to today on mount
   useEffect(() => {
@@ -77,6 +83,95 @@ export function DailyNotes({
   const scrollToToday = useCallback(() => {
     todayRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }, [])
+  
+  // Track which date is currently visible via IntersectionObserver
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+    
+    const observer = new IntersectionObserver(
+      (entries) => {
+        // Find the topmost visible entry
+        let topEntry: IntersectionObserverEntry | null = null
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            if (!topEntry || entry.boundingClientRect.top < topEntry.boundingClientRect.top) {
+              topEntry = entry
+            }
+          }
+        }
+        if (topEntry) {
+          const date = (topEntry.target as HTMLElement).dataset.date
+          if (date) setCurrentViewDate(date)
+        }
+      },
+      {
+        root: container,
+        rootMargin: '-10% 0px -70% 0px',
+        threshold: 0,
+      }
+    )
+    
+    // Observe all day elements
+    dayRefs.current.forEach(el => observer.observe(el))
+    
+    return () => observer.disconnect()
+  }, [startDate, endDate]) // re-observe when date range changes
+  
+  // Handle date selection from calendar/timeline
+  const handleDateSelect = useCallback(async (date: string) => {
+    const el = dayRefs.current.get(date)
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      setCurrentViewDate(date)
+      return
+    }
+    
+    // Date not loaded — need to load range around it
+    const newStart = addDays(date, -7)
+    const newEnd = addDays(date, 7)
+    
+    try {
+      const [newPages, newProjected] = await Promise.all([
+        getDailyPagesRange(newStart, newEnd),
+        getProjectedTasksForRange(newStart, newEnd),
+      ])
+      
+      const newPageIds = Object.values(newPages).flat().map(p => p.id)
+      let newChildren: Record<string, import('@/lib/db').Page[]> = {}
+      if (newPageIds.length > 0) {
+        newChildren = await getChildPagesForParents(newPageIds)
+      }
+      
+      setPages(prev => ({ ...prev, ...newPages }))
+      setProjectedTasks(prev => ({ ...prev, ...newProjected }))
+      setChildPagesMap(prev => ({ ...prev, ...newChildren }))
+      
+      if (newStart < startDate) setStartDate(newStart)
+      if (newEnd > endDate) setEndDate(newEnd)
+      
+      setCurrentViewDate(date)
+      
+      // Scroll after state update
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          const el = dayRefs.current.get(date)
+          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        }, 100)
+      })
+    } catch (error) {
+      console.error('Failed to load date range:', error)
+    }
+  }, [startDate, endDate])
+  
+  // Compute dates that have notes
+  const datesWithNotes = useMemo(() => {
+    const set = new Set<string>()
+    for (const [date, pageList] of Object.entries(pages)) {
+      if (pageList.length > 0) set.add(date)
+    }
+    return set
+  }, [pages])
   
   // Load more days in the past
   const loadPast = useCallback(async () => {
@@ -231,6 +326,20 @@ export function DailyNotes({
       ref={containerRef}
       style={{ height: '100vh', overflowY: 'auto', backgroundColor: 'white', width: '100%' }}
     >
+      {/* Mini Calendar - Desktop */}
+      <MiniCalendar
+        currentDate={currentViewDate}
+        datesWithNotes={datesWithNotes}
+        onDateSelect={handleDateSelect}
+      />
+      
+      {/* Mobile Timeline */}
+      <MobileTimeline
+        currentDate={currentViewDate}
+        datesWithNotes={datesWithNotes}
+        onDateSelect={handleDateSelect}
+      />
+      
       {/* Loading indicator - past */}
       {isLoadingPast && (
         <div style={{ padding: '24px 0', textAlign: 'center' }}>
@@ -243,7 +352,12 @@ export function DailyNotes({
         {dates.map((date) => (
           <div
             key={date}
-            ref={date === todayDate ? todayRef : undefined}
+            data-date={date}
+            ref={(el) => {
+              if (date === todayDate && el) (todayRef as React.MutableRefObject<HTMLDivElement | null>).current = el
+              if (el) dayRefs.current.set(date, el)
+              else dayRefs.current.delete(date)
+            }}
           >
             <DayCard
               date={date}

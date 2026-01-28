@@ -48,6 +48,15 @@ body {
   background: #d4d4d4;
 }
 
+/* Hide scrollbar for mobile timeline */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
 /* Selection color */
 ::selection {
   background-color: #e5e5e5;
