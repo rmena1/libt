@@ -346,6 +346,24 @@ export function DayCard({ date, initialPages, projectedTasks = [], onTaskUpdate,
       >
         {pages.length > 0 || projected.length > 0 ? (
           <div className="space-y-1">
+            {/* Projected tasks from other days - shown FIRST */}
+            {projected.length > 0 && (
+              <>
+                {projected.map((task) => (
+                  <PageLine
+                    key={`projected-${task.id}`}
+                    page={task}
+                    dailyDate={task.dailyDate || undefined}
+                    onUpdate={handleUpdatePage}
+                    isProjected={true}
+                  />
+                ))}
+                {pages.length > 0 && (
+                  <div className="border-t border-dashed border-gray-200 my-3" />
+                )}
+              </>
+            )}
+            
             {/* Regular pages for this day */}
             {pages.map((page, index) => {
               // Determine if this page is a "title" (root level with children)
@@ -459,24 +477,6 @@ export function DayCard({ date, initialPages, projectedTasks = [], onTaskUpdate,
               </div>
               );
             })}
-            
-            {/* Projected tasks from other days */}
-            {projected.length > 0 && (
-              <>
-                {pages.length > 0 && (
-                  <div className="border-t border-dashed border-gray-200 my-3" />
-                )}
-                {projected.map((task) => (
-                  <PageLine
-                    key={`projected-${task.id}`}
-                    page={task}
-                    dailyDate={task.dailyDate || undefined}
-                    onUpdate={handleUpdatePage}
-                    isProjected={true}
-                  />
-                ))}
-              </>
-            )}
             
             {/* Add new line button */}
             <button

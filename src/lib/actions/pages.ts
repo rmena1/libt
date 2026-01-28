@@ -389,6 +389,9 @@ export async function updatePage(pageId: string, input: UpdatePageInput): Promis
     throw new Error('Page not found')
   }
   
+  // Revalidate to update sidebar starred list and other server-rendered components
+  revalidatePath('/')
+  
   return updatedPage
 }
 
