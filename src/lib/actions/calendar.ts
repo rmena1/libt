@@ -63,7 +63,6 @@ export async function handleGoogleCallback(code: string): Promise<{ success: boo
     updatedAt: new Date(),
   }).where(eq(users.id, session.id))
 
-  revalidatePath('/')
   return { success: true }
 }
 
