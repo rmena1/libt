@@ -21,12 +21,9 @@ interface DayCardProps {
   childPagesMap?: Record<string, ZeroPage[]>
 }
 
-export const DayCard = memo(function DayCard({ date, pages: pagesProp = [], projectedTasks = [], overdueTasks = [], onTaskUpdate, allFolders, childPagesMap }: DayCardProps) {
+export const DayCard = memo(function DayCard({ date, pages: pagesProp = [], projectedTasks: projected = [], overdueTasks: overdue = [], onTaskUpdate, allFolders, childPagesMap }: DayCardProps) {
   const z = useZero()
   const pages = pagesProp
-
-  const [projected, setProjected] = useState<ZeroPage[]>(projectedTasks)
-  const [overdue, setOverdue] = useState<ZeroPage[]>(overdueTasks)
   const isCreatingRef = useRef(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const pageLineRefs = useRef<Map<string, PageLineHandle>>(new Map())
@@ -516,9 +513,6 @@ export const DayCard = memo(function DayCard({ date, pages: pagesProp = [], proj
     return set
   }, [pages, childPagesMap])
   
-  useEffect(() => { setProjected(projectedTasks) }, [projectedTasks])
-  useEffect(() => { setOverdue(overdueTasks) }, [overdueTasks])
-  
   useEffect(() => {
     if (focusPageId) {
       const timer = setTimeout(() => {
@@ -664,13 +658,7 @@ export const DayCard = memo(function DayCard({ date, pages: pagesProp = [], proj
       folderId: updatedPage.folderId,
     })
     
-    // Only update projected/overdue state for task-related changes (not content-only edits)
     if (updatedPage.isTask || updatedPage.taskCompleted !== undefined) {
-      setProjected(prev => prev.map(p => p.id === updatedPage.id ? { ...p, ...updatedPage } : p))
-      setOverdue(prev => {
-        if (updatedPage.taskCompleted) return prev.filter(p => p.id !== updatedPage.id)
-        return prev.map(p => p.id === updatedPage.id ? { ...p, ...updatedPage } : p)
-      })
       onTaskUpdate?.(updatedPage)
     }
   }, [z.mutate, onTaskUpdate])

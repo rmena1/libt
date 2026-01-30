@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, memo } from 'react'
 import { cn, today } from '@/lib/utils'
 import { CalendarTimeline } from './calendar-timeline'
 import { CalendarSettings } from './calendar-settings'
@@ -48,7 +48,7 @@ const MONTH_NAMES = [
   'July', 'August', 'September', 'October', 'November', 'December',
 ]
 
-export function MiniCalendar({ currentDate, datesWithNotes, onDateSelect }: MiniCalendarProps) {
+export const MiniCalendar = memo(function MiniCalendar({ currentDate, datesWithNotes, onDateSelect }: MiniCalendarProps) {
   const todayStr = today()
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [viewYear, viewMonth] = useMemo(() => {
@@ -122,7 +122,7 @@ export function MiniCalendar({ currentDate, datesWithNotes, onDateSelect }: Mini
                   key={di}
                   onClick={() => onDateSelect(dateStr)}
                   className={cn(
-                    'relative w-[28px] h-[28px] mx-auto flex items-center justify-center text-[11.5px] rounded-full transition-all duration-150',
+                    'relative w-[28px] h-[28px] mx-auto flex items-center justify-center text-[11.5px] rounded-full transition-colors duration-150',
                     isSelected
                       ? 'bg-gray-900 text-white font-semibold shadow-sm shadow-gray-900/20'
                       : isToday
@@ -154,4 +154,4 @@ export function MiniCalendar({ currentDate, datesWithNotes, onDateSelect }: Mini
       />
     </div>
   )
-}
+})

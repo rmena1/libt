@@ -21,9 +21,10 @@ const SCROLL_THRESHOLD = 300
 const MAX_DAYS_LOADED = 21
 const VIRTUALIZATION_WINDOW = 5
 
-// FIX #4: Stable empty array references to avoid defeating memo()
+// Stable empty array references to avoid defeating memo()
 const EMPTY_PAGES: ZeroPage[] = []
 const EMPTY_TASKS: ZeroPage[] = []
+const EMPTY_CHILD_MAP: Record<string, ZeroPage[]> = {}
 
 export function DailyNotes({
   initialStartDate,
@@ -49,16 +50,16 @@ export function DailyNotes({
   const pendingViewDate = useRef<string | null>(null)
   const renderedDates = useRef<Set<string>>(new Set())
   
-  // FIX #13: Memoize today() — won't change during a session
+  // Memoize today() — won't change during a session
   const todayDate = useMemo(() => today(), [])
   
-  // === CONSOLIDATED ZERO QUERIES ===
-  // Single query for all pages in range (no per-day queries)
-  const [allPagesInRange] = useQuery(
+  // === ZERO QUERIES ===
+  // FIX: Single query for ALL pages in date range (root + children + grandchildren)
+  // Eliminates 2 cascading queries that caused chain-reaction re-evaluations
+  const [allPagesInDateRange] = useQuery(
     z.query.page
       .where('dailyDate', '>=', startDate)
       .where('dailyDate', '<=', endDate)
-      .where('parentPageId', 'IS', null)
   )
   
   // Query projected tasks for the date range
@@ -80,57 +81,63 @@ export function DailyNotes({
       .orderBy('taskDate', 'asc')
   )
   
-  // Query child pages for parent pages in range (single consolidated query)
-  // Stable parentIds: only recompute when the actual set of IDs changes,
-  // not when page content changes (which triggers a new allPagesInRange array)
-  const parentIdsKey = useMemo(() => {
-    const ids = allPagesInRange.map(p => p.id)
-    ids.sort()
-    return ids.join(',')
-  }, [allPagesInRange])
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const parentIds = useMemo(() => allPagesInRange.map(p => p.id), [parentIdsKey])
-  const [childPagesRaw] = useQuery(
-    parentIds.length > 0
-      ? z.query.page.where('parentPageId', 'IN', parentIds).orderBy('order', 'asc')
-      : undefined
-  )
-
-  // Grandchildren: children of children (for nested structures like meetings > @HH:MM > transcription)
-  const childIds = useMemo(() => (childPagesRaw ?? []).map(p => p.id), [childPagesRaw])
-  const childIdsKey = childIds.join(',')
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const stableChildIds = useMemo(() => childIds, [childIdsKey])
-  const [grandchildPagesRaw] = useQuery(
-    stableChildIds.length > 0
-      ? z.query.page.where('parentPageId', 'IN', stableChildIds).orderBy('order', 'asc')
-      : undefined
-  )
+  // === DERIVED DATA ===
+  // FIX: Separate root pages from children/grandchildren client-side
+  // instead of using 3 cascading Zero queries
   
-  // === DERIVED DATA (useMemo for performance) ===
+  // Fingerprint for stable references: only recompute derived data when
+  // actual page data changes (not just array reference)
+  const pagesFingerprint = useMemo(() => {
+    return allPagesInDateRange.map(p => `${p.id}:${p.updatedAt}:${p.parentPageId}:${p.order}`).join('|')
+  }, [allPagesInDateRange])
   
-  // Group pages by dailyDate
-  const pagesByDate = useMemo(() => {
-    const map: Record<string, ZeroPage[]> = {}
-    for (const page of allPagesInRange) {
-      const d = page.dailyDate
-      if (d) {
-        if (!map[d]) map[d] = []
-        map[d].push(page as ZeroPage)
+  // Group all pages: root pages by date, child/grandchild pages by parentPageId
+  const { pagesByDate, childPagesMap } = useMemo(() => {
+    const byDate: Record<string, ZeroPage[]> = {}
+    const childMap: Record<string, ZeroPage[]> = {}
+    
+    for (const page of allPagesInDateRange) {
+      if (page.parentPageId) {
+        // Child or grandchild page
+        if (!childMap[page.parentPageId]) childMap[page.parentPageId] = []
+        childMap[page.parentPageId].push(page as ZeroPage)
+      } else {
+        // Root page
+        const d = page.dailyDate
+        if (d) {
+          if (!byDate[d]) byDate[d] = []
+          byDate[d].push(page as ZeroPage)
+        }
       }
     }
-    // Sort each date's pages
-    for (const key in map) {
-      map[key].sort((a, b) => {
+    
+    // Sort root pages by order, then createdAt
+    for (const key in byDate) {
+      byDate[key].sort((a, b) => {
         const orderDiff = (a.order ?? 0) - (b.order ?? 0)
         if (orderDiff !== 0) return orderDiff
         return (a.createdAt ?? 0) - (b.createdAt ?? 0)
       })
     }
-    return map
-  }, [allPagesInRange])
+    
+    // Sort children by order, then createdAt
+    for (const key in childMap) {
+      childMap[key].sort((a, b) => {
+        const orderDiff = (a.order ?? 0) - (b.order ?? 0)
+        if (orderDiff !== 0) return orderDiff
+        return (a.createdAt ?? 0) - (b.createdAt ?? 0)
+      })
+    }
+    
+    return { pagesByDate: byDate, childPagesMap: childMap }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pagesFingerprint])
   
   // Group projected tasks by taskDate (excluding tasks on their own dailyDate)
+  const projectedTasksFingerprint = useMemo(() => {
+    return (projectedTasksRaw ?? []).map(t => `${t.id}:${t.updatedAt}`).join('|')
+  }, [projectedTasksRaw])
+  
   const projectedTasks = useMemo(() => {
     const map: Record<string, ZeroPage[]> = {}
     for (const task of projectedTasksRaw ?? []) {
@@ -140,29 +147,27 @@ export function DailyNotes({
       }
     }
     return map
-  }, [projectedTasksRaw])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectedTasksFingerprint])
   
-  // Group child pages + grandchild pages by parentPageId
-  const childPagesMap = useMemo(() => {
-    const map: Record<string, ZeroPage[]> = {}
-    for (const child of [...(childPagesRaw ?? []), ...(grandchildPagesRaw ?? [])]) {
-      const pid = child.parentPageId
-      if (pid) {
-        if (!map[pid]) map[pid] = []
-        map[pid].push(child as ZeroPage)
-      }
+  // Dates that have notes — stabilized with fingerprint
+  const datesWithNotesKey = useMemo(() => {
+    const dates: string[] = []
+    for (const page of allPagesInDateRange) {
+      if (page.dailyDate && !page.parentPageId) dates.push(page.dailyDate)
     }
-    return map
-  }, [childPagesRaw, grandchildPagesRaw])
+    // Deduplicate and sort for stable key
+    return [...new Set(dates)].sort().join(',')
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pagesFingerprint])
   
-  // Dates that have notes
   const datesWithNotes = useMemo(() => {
     const set = new Set<string>()
-    for (const page of allPagesInRange) {
-      if (page.dailyDate) set.add(page.dailyDate)
+    for (const d of datesWithNotesKey.split(',')) {
+      if (d) set.add(d)
     }
     return set
-  }, [allPagesInRange])
+  }, [datesWithNotesKey])
   
   // === SCROLL & NAVIGATION ===
   

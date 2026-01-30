@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useEffect, useMemo } from 'react'
+import { useRef, useEffect, useMemo, memo } from 'react'
 import { cn, today, addDays } from '@/lib/utils'
 
 interface MobileTimelineProps {
@@ -15,7 +15,7 @@ const MONTH_NAMES = [
   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
 ]
 
-export function MobileTimeline({ currentDate, datesWithNotes, onDateSelect }: MobileTimelineProps) {
+export const MobileTimeline = memo(function MobileTimeline({ currentDate, datesWithNotes, onDateSelect }: MobileTimelineProps) {
   const todayStr = today()
   const scrollRef = useRef<HTMLDivElement>(null)
   const pillRefs = useRef<Map<string, HTMLButtonElement>>(new Map())
@@ -92,18 +92,18 @@ export function MobileTimeline({ currentDate, datesWithNotes, onDateSelect }: Mo
               }}
               onClick={() => onDateSelect(dateStr)}
               className={cn(
-                'flex-shrink-0 flex flex-col items-center w-10 py-1 rounded-lg transition-all duration-200',
-                isSelected ? 'bg-gray-900 scale-105' : 'hover:bg-gray-100 scale-100',
+                'flex-shrink-0 flex flex-col items-center w-10 py-1 rounded-lg transition-colors duration-200',
+                isSelected ? 'bg-gray-900' : 'hover:bg-gray-100',
               )}
             >
               <span className={cn(
-                'text-[10px] font-medium transition-colors duration-200',
+                'text-[10px] font-medium',
                 isSelected ? 'text-gray-300' : 'text-gray-400',
               )}>
                 {dow}
               </span>
               <span className={cn(
-                'text-sm font-medium mt-0.5 transition-colors duration-200',
+                'text-sm font-medium mt-0.5',
                 isSelected ? 'text-white' : isToday ? 'text-gray-900' : 'text-gray-600',
               )}>
                 {day}
@@ -120,4 +120,4 @@ export function MobileTimeline({ currentDate, datesWithNotes, onDateSelect }: Mo
       </div>
     </div>
   )
-}
+})
