@@ -73,7 +73,7 @@ export function MiniCalendar({ currentDate, datesWithNotes, onDateSelect }: Mini
   const makeDate = (day: number) => `${year}-${pad(month + 1)}-${pad(day)}`
 
   return (
-    <div className="hidden md:block fixed top-0 right-0 z-40 bg-gray-50/60 backdrop-blur-xl shadow-[-1px_0_4px_rgba(0,0,0,0.03)] p-6 pt-7 w-[240px] h-screen select-none overflow-y-auto scrollbar-thin">
+    <div className="hidden md:block fixed top-0 right-0 z-40 bg-gray-50/95 shadow-[-1px_0_4px_rgba(0,0,0,0.03)] p-6 pt-7 w-[240px] h-screen select-none overflow-y-auto scrollbar-thin">
       {/* Month Header */}
       <div className="flex items-center justify-between mb-3">
         <button

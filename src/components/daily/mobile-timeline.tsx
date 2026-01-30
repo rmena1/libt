@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useEffect, useMemo, useState } from 'react'
+import { useRef, useEffect, useMemo } from 'react'
 import { cn, today, addDays } from '@/lib/utils'
 
 interface MobileTimelineProps {
@@ -18,31 +18,44 @@ const MONTH_NAMES = [
 export function MobileTimeline({ currentDate, datesWithNotes, onDateSelect }: MobileTimelineProps) {
   const todayStr = today()
   const scrollRef = useRef<HTMLDivElement>(null)
-  const selectedRef = useRef<HTMLButtonElement>(null)
+  const pillRefs = useRef<Map<string, HTMLButtonElement>>(new Map())
 
-  // Generate 31 days centered on currentDate (±15)
+  // Generate a wide fixed range centered on today (±60 days) so the array
+  // doesn't regenerate when currentDate changes — this preserves DOM elements
+  // and allows CSS transitions to animate the selection change
   const dates = useMemo(() => {
+    const t = today()
     const result: string[] = []
-    for (let i = -15; i <= 15; i++) {
-      result.push(addDays(currentDate, i))
+    for (let i = -60; i <= 60; i++) {
+      result.push(addDays(t, i))
     }
     return result
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // intentionally empty — fixed range based on today
+
+  // Smooth-scroll the timeline to center the selected date pill
+  const prevDateRef = useRef(currentDate)
+  useEffect(() => {
+    const el = pillRefs.current.get(currentDate)
+    const container = scrollRef.current
+    if (!el || !container) return
+
+    const left = el.offsetLeft - container.clientWidth / 2 + el.clientWidth / 2
+    const isInitial = prevDateRef.current === currentDate
+    container.scrollTo({ left, behavior: isInitial ? 'instant' : 'smooth' })
+    prevDateRef.current = currentDate
   }, [currentDate])
 
-  // Track previous date to distinguish user tap (handled in onClick) from scroll-detected changes
-  const prevDateRef = useRef(currentDate)
-  
-  // Scroll the horizontal timeline to show the selected date pill,
-  // but use 'instant' to avoid visual jank during rapid scroll detection
+  // Also do initial scroll on mount
   useEffect(() => {
-    if (prevDateRef.current !== currentDate && selectedRef.current && scrollRef.current) {
-      const container = scrollRef.current
-      const el = selectedRef.current
+    const el = pillRefs.current.get(currentDate)
+    const container = scrollRef.current
+    if (el && container) {
       const left = el.offsetLeft - container.clientWidth / 2 + el.clientWidth / 2
       container.scrollTo({ left, behavior: 'instant' })
     }
-    prevDateRef.current = currentDate
-  }, [currentDate])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const [cy, cm] = currentDate.split('-').map(Number)
 
@@ -50,7 +63,10 @@ export function MobileTimeline({ currentDate, datesWithNotes, onDateSelect }: Mo
     <div className="md:hidden sticky top-0 z-30 bg-white border-b border-gray-100">
       {/* Month label */}
       <div className="px-4 pt-2 pb-1">
-        <span className="text-xs font-medium text-gray-500">
+        <span
+          key={`${cy}-${cm}`}
+          className="text-xs font-medium text-gray-500 inline-block animate-fade-in"
+        >
           {MONTH_NAMES[cm - 1]} {cy}
         </span>
       </div>
@@ -71,21 +87,23 @@ export function MobileTimeline({ currentDate, datesWithNotes, onDateSelect }: Mo
           return (
             <button
               key={dateStr}
-              ref={isSelected ? selectedRef : undefined}
+              ref={(el) => {
+                if (el) pillRefs.current.set(dateStr, el)
+              }}
               onClick={() => onDateSelect(dateStr)}
               className={cn(
-                'flex-shrink-0 flex flex-col items-center w-10 py-1 rounded-lg transition-colors',
-                isSelected ? 'bg-gray-900' : 'hover:bg-gray-100',
+                'flex-shrink-0 flex flex-col items-center w-10 py-1 rounded-lg transition-all duration-200',
+                isSelected ? 'bg-gray-900 scale-105' : 'hover:bg-gray-100 scale-100',
               )}
             >
               <span className={cn(
-                'text-[10px] font-medium',
+                'text-[10px] font-medium transition-colors duration-200',
                 isSelected ? 'text-gray-300' : 'text-gray-400',
               )}>
                 {dow}
               </span>
               <span className={cn(
-                'text-sm font-medium mt-0.5',
+                'text-sm font-medium mt-0.5 transition-colors duration-200',
                 isSelected ? 'text-white' : isToday ? 'text-gray-900' : 'text-gray-600',
               )}>
                 {day}

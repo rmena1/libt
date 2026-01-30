@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { type CalendarEvent } from '@/lib/actions/calendar'
 import { getCalendarEvents } from '@/lib/actions/calendar'
 
@@ -18,6 +18,9 @@ function formatTime(date: Date): string {
   return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`
 }
 
+// FIX #16: Simple cache for fetched calendar dates
+const eventsCache = new Map<string, CalendarEvent[]>()
+
 export function CalendarTimeline({ currentDate, onSettingsClick }: CalendarTimelineProps) {
   const [events, setEvents] = useState<CalendarEvent[]>([])
   const [loading, setLoading] = useState(true)
@@ -25,10 +28,20 @@ export function CalendarTimeline({ currentDate, onSettingsClick }: CalendarTimel
   const [loaded, setLoaded] = useState(false)
 
   const fetchEvents = useCallback(async () => {
+    // Check cache first
+    const cached = eventsCache.get(currentDate)
+    if (cached) {
+      setEvents(cached)
+      setLoading(false)
+      setLoaded(true)
+      setHasUrl(true)
+      return
+    }
     setLoading(true)
     setLoaded(false)
     try {
       const evts = await getCalendarEvents(currentDate)
+      eventsCache.set(currentDate, evts)
       setEvents(evts)
       setHasUrl(true)
     } catch {
@@ -198,9 +211,15 @@ function TimelineGrid({ timedEvents }: { timedEvents: CalendarEvent[] }) {
 function CurrentTimeIndicator() {
   const [now, setNow] = useState(new Date())
   
+  // FIX #6: Only run interval when page is visible
   useEffect(() => {
-    const interval = setInterval(() => setNow(new Date()), 60000)
-    return () => clearInterval(interval)
+    let interval: ReturnType<typeof setInterval> | null = null
+    const start = () => { interval = setInterval(() => setNow(new Date()), 60000) }
+    const stop = () => { if (interval) { clearInterval(interval); interval = null } }
+    const onVisChange = () => document.hidden ? stop() : start()
+    document.addEventListener('visibilitychange', onVisChange)
+    if (!document.hidden) start()
+    return () => { stop(); document.removeEventListener('visibilitychange', onVisChange) }
   }, [])
   
   const hour = now.getHours() + now.getMinutes() / 60

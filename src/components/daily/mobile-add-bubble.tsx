@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useZero } from '@rocicorp/zero/react'
 import { newPageInsert } from '@/zero/hooks'
 import { today, generateId } from '@/lib/utils'
+import { useRecording } from '@/components/recording/recording-context'
 
 interface MobileAddBubbleProps {
   isOpen: boolean
@@ -19,6 +20,7 @@ export function MobileAddBubble({ isOpen, onClose, onPageCreated }: MobileAddBub
   const [isSubmitting, setIsSubmitting] = useState(false)
   const z = useZero()
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const { startRecording, isRecording, isTranscribing } = useRecording()
   
   useEffect(() => {
     if (isOpen && inputRef.current) {
@@ -168,18 +170,38 @@ export function MobileAddBubble({ isOpen, onClose, onPageCreated }: MobileAddBub
           </>
         )}
         
-        <button
-          type="button"
-          style={{
-            width: '100%', padding: '14px', marginTop: '20px', fontSize: '16px', fontWeight: 600,
-            color: '#ffffff', backgroundColor: content.trim() ? '#111827' : '#9ca3af',
-            border: 'none', borderRadius: '10px', cursor: content.trim() ? 'pointer' : 'not-allowed',
-            transition: 'background-color 0.15s ease',
-          }}
-          onClick={handleSubmit} disabled={!content.trim() || isSubmitting}
-        >
-          {isSubmitting ? 'Adding...' : isTask ? 'Add Task' : 'Add Note'}
-        </button>
+        <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+          <button
+            type="button"
+            style={{
+              flex: 1, padding: '14px', fontSize: '16px', fontWeight: 600,
+              color: '#ffffff', backgroundColor: content.trim() ? '#111827' : '#9ca3af',
+              border: 'none', borderRadius: '10px', cursor: content.trim() ? 'pointer' : 'not-allowed',
+              transition: 'background-color 0.15s ease',
+            }}
+            onClick={handleSubmit} disabled={!content.trim() || isSubmitting}
+          >
+            {isSubmitting ? 'Adding...' : isTask ? 'Add Task' : 'Add Note'}
+          </button>
+          <button
+            type="button"
+            style={{
+              padding: '14px 12px', fontSize: '13px', fontWeight: 600,
+              color: '#991b1b', backgroundColor: '#fef2f2',
+              border: '1px solid #fecaca', borderRadius: '10px', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: '5px', whiteSpace: 'nowrap',
+            }}
+            disabled={isRecording || isTranscribing}
+            onClick={async () => { await startRecording('mic'); onClose() }}
+            title="Record with microphone"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+            </svg>
+            Mic
+          </button>
+        </div>
       </div>
     </div>
   )

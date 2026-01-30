@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation'
 import { logout } from '@/lib/actions/auth'
 import { useZero, useQuery } from '@rocicorp/zero/react'
 import type { ZeroFolder, ZeroPage } from '@/zero/hooks'
+import { useRecording, type RecordingMode } from '@/components/recording/recording-context'
 
 interface SidebarProps {
   email: string
@@ -15,6 +16,8 @@ export function Sidebar({ email }: SidebarProps) {
   const pathname = usePathname()
   const [isCollapsed, setIsCollapsed] = useState(false)
   const z = useZero()
+  const { isRecording, isTranscribing, duration, recordingMode, startRecording, stopRecording } = useRecording()
+  const [showRecordMenu, setShowRecordMenu] = useState(false)
   
   // Reactive queries from Zero
   const [allFolders] = useQuery(z.query.folder.orderBy('order', 'asc').orderBy('name', 'asc'))
@@ -82,6 +85,93 @@ export function Sidebar({ email }: SidebarProps) {
               </a>
             )
           })}
+
+          {/* Record button with mode picker */}
+          {!isCollapsed && (
+            isRecording ? (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px',
+                borderRadius: '8px', backgroundColor: '#fef2f2', marginTop: '4px',
+              }}>
+                <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#ef4444', animation: 'pulse-rec 1.2s ease-in-out infinite', flexShrink: 0 }} />
+                <style>{`@keyframes pulse-rec { 0%,100% { opacity:1 } 50% { opacity:0.3 } }`}</style>
+                {recordingMode === 'meeting' && (
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#991b1b" strokeWidth="2" style={{ flexShrink: 0 }}>
+                    <rect x="1" y="4" width="22" height="16" rx="2" ry="2" /><path d="M1 10h22" />
+                  </svg>
+                )}
+                <span style={{ fontSize: '13px', fontWeight: 600, color: '#991b1b', fontVariantNumeric: 'tabular-nums' }}>
+                  {String(Math.floor(duration / 60)).padStart(2, '0')}:{String(duration % 60).padStart(2, '0')}
+                </span>
+                <button onClick={stopRecording} style={{
+                  marginLeft: 'auto', padding: '3px 10px', fontSize: '12px', fontWeight: 600,
+                  color: '#fff', backgroundColor: '#ef4444', border: 'none', borderRadius: '5px', cursor: 'pointer',
+                }}>Stop</button>
+              </div>
+            ) : isTranscribing ? (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px',
+                borderRadius: '8px', backgroundColor: '#f3f4f6', marginTop: '4px',
+              }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" style={{ animation: 'spin-s 1s linear infinite' }}>
+                  <path d="M21 12a9 9 0 11-6.219-8.56" />
+                </svg>
+                <style>{`@keyframes spin-s { to { transform:rotate(360deg) } }`}</style>
+                <span style={{ fontSize: '13px', fontWeight: 500, color: '#6b7280' }}>Transcribing...</span>
+              </div>
+            ) : (
+              <div style={{ position: 'relative', marginTop: '4px' }}>
+                <button onClick={() => setShowRecordMenu(!showRecordMenu)} style={{
+                  display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 12px',
+                  borderRadius: '8px', fontSize: '14px', fontWeight: 500, color: '#6b7280',
+                  backgroundColor: showRecordMenu ? '#f3f4f6' : 'transparent', border: 'none', cursor: 'pointer', width: '100%', textAlign: 'left',
+                }}>
+                  <svg className="h-5 w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                    <line x1="12" y1="19" x2="12" y2="23" strokeLinecap="round" />
+                    <line x1="8" y1="23" x2="16" y2="23" strokeLinecap="round" />
+                  </svg>
+                  Record
+                </button>
+                {showRecordMenu && (
+                  <div style={{
+                    position: 'absolute', left: '0', top: '100%', marginTop: '4px',
+                    backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '10px',
+                    boxShadow: '0 4px 16px rgba(0,0,0,0.12)', width: '220px', zIndex: 200,
+                    overflow: 'hidden',
+                  }}>
+                    <button onClick={async () => { setShowRecordMenu(false); await startRecording('mic') }} style={{
+                      display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px',
+                      width: '100%', border: 'none', background: 'none', cursor: 'pointer',
+                      fontSize: '13px', fontWeight: 500, color: '#374151', textAlign: 'left',
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#f9fafb')}
+                    onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+                        <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                      </svg>
+                      Micrófono
+                    </button>
+                    <div style={{ height: '1px', backgroundColor: '#f3f4f6' }} />
+                    <button onClick={async () => { setShowRecordMenu(false); await startRecording('meeting') }} style={{
+                      display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px',
+                      width: '100%', border: 'none', background: 'none', cursor: 'pointer',
+                      fontSize: '13px', fontWeight: 500, color: '#374151', textAlign: 'left',
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#f9fafb')}
+                    onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                        <rect x="1" y="4" width="22" height="16" rx="2" ry="2" /><path d="M1 10h22" />
+                      </svg>
+                      Reunión (audio del sistema)
+                    </button>
+                  </div>
+                )}
+              </div>
+            )
+          )}
 
           {!isCollapsed && starredPages.length > 0 && (
             <div style={{ marginTop: '8px' }}>

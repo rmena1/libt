@@ -1,7 +1,7 @@
 import { Page, BrowserContext } from '@playwright/test';
 
-// Test session token (created in test setup)
-export const TEST_SESSION = 'ecp2nl7ir93pm7sp9totg';
+// Test session token — uses clod3@test.com account (NOT Rai's personal account)
+export const TEST_SESSION = 'bzhnmyefkdwk54pzkvlwu';
 
 /**
  * Set authentication cookie for tests

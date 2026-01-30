@@ -1,14 +1,12 @@
 'use client'
 
 import { usePathname } from 'next/navigation'
-import Link from 'next/link'
 
 interface NavItem {
   name: string
   href: string
   icon: React.ReactNode
   placeholder?: boolean
-  searchButton?: boolean
 }
 
 export function BottomNav() {
@@ -25,12 +23,11 @@ export function BottomNav() {
       ),
     },
     {
-      name: 'Search',
-      href: '/search',
-      searchButton: true,
+      name: 'Folders',
+      href: '/folders',
       icon: (
         <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+          <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
         </svg>
       ),
     },
@@ -81,43 +78,14 @@ export function BottomNav() {
           justifyContent: 'space-around',
           height: '60px',
           paddingBottom: 'env(safe-area-inset-bottom, 0px)',
-          backgroundColor: 'rgba(255, 255, 255, 0.92)',
-          backdropFilter: 'blur(12px)',
-          WebkitBackdropFilter: 'blur(12px)',
+          // FIX #11: Solid background instead of expensive backdrop-blur
+          backgroundColor: 'rgba(255, 255, 255, 0.97)',
           borderTop: '1px solid rgba(0, 0, 0, 0.06)',
         }}
       >
       {navItems.map((item) => {
         const active = isActive(item.href)
         
-        if (item.searchButton) {
-          return (
-            <button
-              key={item.href}
-              data-testid="mobile-search-button"
-              onClick={() => (window as any).__openSearch?.()}
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flex: 1,
-                height: '100%',
-                border: 'none',
-                background: 'none',
-                cursor: 'pointer',
-                color: '#6b7280',
-                transition: 'color 150ms ease',
-              }}
-            >
-              <span>{item.icon}</span>
-              <span style={{ fontSize: '10px', marginTop: '4px', fontWeight: 500, letterSpacing: '0.01em' }}>
-                {item.name}
-              </span>
-            </button>
-          )
-        }
-
         if (item.placeholder) {
           return (
             <button
@@ -153,7 +121,7 @@ export function BottomNav() {
         }
         
         return (
-          <Link
+          <a
             key={item.href}
             href={item.href}
             style={{
@@ -195,7 +163,7 @@ export function BottomNav() {
             >
               {item.name}
             </span>
-          </Link>
+          </a>
         )
       })}
     </nav>

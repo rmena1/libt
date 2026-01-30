@@ -5,9 +5,11 @@ import { useZero } from '@rocicorp/zero/react'
 import { type ZeroPage, newPageInsert } from '@/zero/hooks'
 import { PageLine, type PageLineHandle, parseTaskContent } from './page-line'
 import { useToast } from '@/components/providers/toast-provider'
+import { useBlockSelection } from '@/components/providers/block-selection-provider'
 import { formatDateDisplay, isToday, cn, generateId } from '@/lib/utils'
 
 const CHILD_DROP_INDENT = 40 // indent for drop indicators in folder children
+const MAX_INDENT = 4
 
 interface DayCardProps {
   date: string
@@ -35,7 +37,216 @@ export const DayCard = memo(function DayCard({ date, pages: pagesProp = [], proj
   const [dropIndicatorIndex, setDropIndicatorIndex] = useState<number | null>(null)
   const [dropTarget, setDropTarget] = useState<{ type: 'main'; index: number } | { type: 'child'; parentId: string; index: number } | null>(null)
   const { showError } = useToast()
+  const blockSelection = useBlockSelection()
   
+  // Refs for blockSelection values used in event handlers/effects
+  const blockSelectionRef = useRef(blockSelection)
+  blockSelectionRef.current = blockSelection
+  
+  // Build flat ordered list of all visible page IDs (main + folder children)
+  const allOrderedIds = useMemo(() => {
+    const ids: string[] = []
+    for (let i = 0; i < pages.length; i++) {
+      const page = pages[i]
+      const pageIndent = page.indent ?? 0
+      // Check if hidden by collapse
+      let hidden = false
+      for (let j = i - 1; j >= 0; j--) {
+        const ancestorIndent = pages[j].indent ?? 0
+        if (ancestorIndent < pageIndent) {
+          if (collapsedIds.has(pages[j].id)) { hidden = true; break }
+          if (ancestorIndent === 0) break
+        }
+      }
+      if (hidden) continue
+      ids.push(page.id)
+      // Add folder children if not collapsed
+      if (!collapsedIds.has(page.id)) {
+        const children = childPagesMap?.[page.id]?.filter(c => !pages.some(p => p.id === c.id)) ?? []
+        for (const child of children) {
+          ids.push(child.id)
+        }
+      }
+    }
+    return ids
+  }, [pages, childPagesMap, collapsedIds])
+
+  const allOrderedIdsRef = useRef(allOrderedIds)
+  allOrderedIdsRef.current = allOrderedIds
+
+  // Handle block click (shift+click for range, meta+click for toggle, plain click clears)
+  const handleBlockClick = useCallback((e: React.MouseEvent, pageId: string) => {
+    const bs = blockSelectionRef.current
+    const ids = allOrderedIdsRef.current
+    if (e.shiftKey) {
+      e.preventDefault()
+      const active = document.activeElement as HTMLElement
+      if (active?.tagName === 'TEXTAREA') active.blur()
+      const anchor = bs.anchorId
+      if (anchor && ids.includes(anchor)) {
+        bs.selectRange(anchor, pageId, ids)
+      } else {
+        bs.select(pageId)
+      }
+      return
+    }
+    if (e.metaKey || e.ctrlKey) {
+      e.preventDefault()
+      bs.toggleSelect(pageId)
+      return
+    }
+    if (bs.hasSelection()) {
+      bs.clearSelection()
+    }
+    bs.setAnchor(pageId)
+  }, [])
+
+  // Keyboard handler for block selection actions
+  const handleContainerKeyDown = useCallback((e: React.KeyboardEvent) => {
+    const bs = blockSelectionRef.current
+    const orderedIds = allOrderedIdsRef.current
+    const sel = bs.hasSelection()
+    
+    // Cmd+A / Ctrl+A — select all
+    if ((e.metaKey || e.ctrlKey) && e.key === 'a') {
+      const active = document.activeElement
+      if (active?.tagName === 'TEXTAREA' && !sel) return
+      e.preventDefault()
+      bs.selectAll(orderedIds)
+      return
+    }
+
+    if (!sel) return
+
+    if (e.key === 'Escape') {
+      e.preventDefault()
+      bs.clearSelection()
+      return
+    }
+
+    if (e.key === 'Delete' || e.key === 'Backspace') {
+      e.preventDefault()
+      const active = document.activeElement as HTMLElement | null
+      if (active?.tagName === 'TEXTAREA') active.blur()
+      const ids = bs.getSelectedIds()
+      bs.clearSelection()
+      for (const id of ids) {
+        z.mutate.page.delete({ id })
+      }
+      return
+    }
+
+    if (e.key === 'Tab') {
+      e.preventDefault()
+      const ids = bs.getSelectedIds()
+      for (const id of ids) {
+        const page = pages.find(p => p.id === id)
+        if (!page) continue
+        const currentIndent = page.indent ?? 0
+        const newIndent = e.shiftKey
+          ? Math.max(0, currentIndent - 1)
+          : Math.min(MAX_INDENT, currentIndent + 1)
+        if (newIndent !== currentIndent) {
+          z.mutate.page.update({ id, indent: newIndent })
+        }
+      }
+      return
+    }
+
+    if ((e.metaKey || e.ctrlKey) && e.key === 'c') {
+      e.preventDefault()
+      const ids = bs.getSelectedIds()
+      const filtered = orderedIds.filter(id => ids.includes(id))
+      const texts: string[] = []
+      for (const id of filtered) {
+        const page = pages.find(p => p.id === id)
+        if (page) {
+          texts.push(page.content)
+        } else {
+          for (const parentId in childPagesMap ?? {}) {
+            const child = childPagesMap?.[parentId]?.find(c => c.id === id)
+            if (child) { texts.push(child.content); break }
+          }
+        }
+      }
+      navigator.clipboard.writeText(texts.join('\n')).catch(() => {})
+      return
+    }
+  }, [pages, childPagesMap, z.mutate])
+
+  // Text-to-block drag selection (Notion-style)
+  const textDragOriginRect = useRef<DOMRect | null>(null)
+
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    const pageEl = (e.target as HTMLElement).closest('[data-page-id]')
+    if (!pageEl) return
+    const pageId = pageEl.getAttribute('data-page-id')
+    if (!pageId) return
+    if ((e.target as HTMLElement).closest('button')) return
+    if ((e.target as HTMLElement).closest('[draggable]')) return
+
+    const bs = blockSelectionRef.current
+    if ((e.target as HTMLElement).tagName === 'TEXTAREA') {
+      const textarea = e.target as HTMLTextAreaElement
+      bs.setTextDragOrigin(pageId)
+      textDragOriginRect.current = textarea.getBoundingClientRect()
+      return
+    }
+
+    bs.setTextDragOrigin(pageId)
+    textDragOriginRect.current = pageEl.getBoundingClientRect()
+  }, [])
+
+  useEffect(() => {
+    // Only attach document listeners when a text drag is in progress
+    if (!blockSelection.textDragOriginId) return
+
+    const handleDocMouseMove = (e: MouseEvent) => {
+      if (!(e.buttons & 1)) return
+      const bs = blockSelectionRef.current
+
+      const originRect = textDragOriginRect.current
+      if (!originRect) return
+
+      const mouseY = e.clientY
+      const isOutsideOrigin = mouseY < originRect.top - 5 || mouseY > originRect.bottom + 5
+
+      if (isOutsideOrigin && !bs.isTextDragActive) {
+        bs.activateTextDrag()
+        window.getSelection()?.removeAllRanges()
+      }
+
+      if (bs.isTextDragActive) {
+        e.preventDefault()
+        window.getSelection()?.removeAllRanges()
+
+        const el = document.elementFromPoint(e.clientX, e.clientY)
+        const pageEl = el?.closest?.('[data-page-id]')
+        if (pageEl) {
+          const targetId = pageEl.getAttribute('data-page-id')
+          if (targetId && bs.textDragOriginId) {
+            bs.selectRange(bs.textDragOriginId, targetId, allOrderedIdsRef.current)
+          }
+        }
+      }
+    }
+
+    const handleDocMouseUp = () => {
+      const bs = blockSelectionRef.current
+      if (bs.textDragOriginId) {
+        bs.clearTextDrag()
+        textDragOriginRect.current = null
+      }
+    }
+
+    document.addEventListener('mousemove', handleDocMouseMove)
+    document.addEventListener('mouseup', handleDocMouseUp)
+    return () => {
+      document.removeEventListener('mousemove', handleDocMouseMove)
+      document.removeEventListener('mouseup', handleDocMouseUp)
+    }
+  }, [blockSelection.textDragOriginId])
+
   const toggleCollapse = useCallback((pageId: string) => {
     setCollapsedIds(prev => {
       const next = new Set(prev)
@@ -139,6 +350,10 @@ export const DayCard = memo(function DayCard({ date, pages: pagesProp = [], proj
       return
     }
 
+    // Multi-select move: if dragged page is part of selection, move all selected
+    const selectedIds = blockSelection.getSelectedIds()
+    const isMultiMove = selectedIds.length > 1 && selectedIds.includes(draggedPageId)
+
     // Dropping into a folder's children
     if (dropTarget.type === 'child') {
       const parentPage = pages.find(p => p.id === dropTarget.parentId)
@@ -209,6 +424,26 @@ export const DayCard = memo(function DayCard({ date, pages: pagesProp = [], proj
         parentPageId: null,
         folderId: null,
       })
+      
+      setFocusPageId(draggedPageId)
+      handleDragEnd()
+      return
+    }
+
+    if (isMultiMove) {
+      // Multi-select move: remove all selected pages, insert them at drop position
+      const selectedSet = new Set(selectedIds)
+      const remaining = pages.filter(p => !selectedSet.has(p.id))
+      const movedPages = pages.filter(p => selectedSet.has(p.id))
+      // Maintain their original relative order
+      const insertAt = Math.min(dropIdx, remaining.length)
+      const reordered = [...remaining.slice(0, insertAt), ...movedPages, ...remaining.slice(insertAt)]
+      
+      for (let i = 0; i < reordered.length; i++) {
+        if ((reordered[i].order ?? 0) !== i) {
+          z.mutate.page.update({ id: reordered[i].id, order: i })
+        }
+      }
       
       setFocusPageId(draggedPageId)
       handleDragEnd()
@@ -429,12 +664,15 @@ export const DayCard = memo(function DayCard({ date, pages: pagesProp = [], proj
       folderId: updatedPage.folderId,
     })
     
-    setProjected(prev => prev.map(p => p.id === updatedPage.id ? { ...p, ...updatedPage } : p))
-    setOverdue(prev => {
-      if (updatedPage.taskCompleted) return prev.filter(p => p.id !== updatedPage.id)
-      return prev.map(p => p.id === updatedPage.id ? { ...p, ...updatedPage } : p)
-    })
-    onTaskUpdate?.(updatedPage)
+    // Only update projected/overdue state for task-related changes (not content-only edits)
+    if (updatedPage.isTask || updatedPage.taskCompleted !== undefined) {
+      setProjected(prev => prev.map(p => p.id === updatedPage.id ? { ...p, ...updatedPage } : p))
+      setOverdue(prev => {
+        if (updatedPage.taskCompleted) return prev.filter(p => p.id !== updatedPage.id)
+        return prev.map(p => p.id === updatedPage.id ? { ...p, ...updatedPage } : p)
+      })
+      onTaskUpdate?.(updatedPage)
+    }
   }, [z.mutate, onTaskUpdate])
   
   // Delete a page via Zero mutate
@@ -553,13 +791,17 @@ export const DayCard = memo(function DayCard({ date, pages: pagesProp = [], proj
       <div 
         ref={containerRef}
         onClick={handleContainerClick}
+        onKeyDown={handleContainerKeyDown}
+        onMouseDown={handleMouseDown}
         onDragOver={handleDragOver}
         onDrop={handleDrop}
         onDragLeave={() => { setDropIndicatorIndex(null); setDropTarget(null) }}
         className={cn(
           'min-h-[180px] md:min-h-[220px] cursor-text',
-          pages.length === 0 && 'flex items-start'
+          pages.length === 0 && 'flex items-start',
+          blockSelection.isTextDragActive && 'select-none'
         )}
+        tabIndex={-1}
       >
         {pages.length > 0 || projected.length > 0 || overdue.length > 0 ? (
           <div className="space-y-1">
@@ -697,6 +939,8 @@ export const DayCard = memo(function DayCard({ date, pages: pagesProp = [], proj
                   onDragStart={handleDragStart}
                   onDragEnd={handleDragEnd}
                   isDragging={draggedPageId === page.id}
+                  isBlockSelected={blockSelection.isSelected(page.id)}
+                  onBlockClick={handleBlockClick}
                   index={index}
                   onMergeWithPrevious={handleMergeWithPrevious}
                   onNavigateUp={() => {
@@ -738,7 +982,7 @@ export const DayCard = memo(function DayCard({ date, pages: pagesProp = [], proj
                 <div style={{
                   display: 'grid',
                   gridTemplateRows: collapsedIds.has(page.id) ? '0fr' : '1fr',
-                  transition: 'grid-template-rows 200ms ease',
+                  // FIX #10: Removed expensive grid-template-rows transition
                 }}>
                 <div style={{ overflow: 'hidden' }}>
                 {folderChildren.map((child, childIndex) => (
@@ -775,16 +1019,27 @@ export const DayCard = memo(function DayCard({ date, pages: pagesProp = [], proj
                     autoFocus={focusPageId === child.id}
                     focusCursorPosition={focusPageId === child.id ? focusCursorPos : undefined}
                     indentOffset={1}
+                    hasChildren={(childPagesMap?.[child.id]?.length ?? 0) > 0}
+                    isCollapsed={collapsedIds.has(child.id)}
+                    onToggleCollapse={() => toggleCollapse(child.id)}
                     onDragStart={handleDragStart}
                     onDragEnd={handleDragEnd}
                     isDragging={draggedPageId === child.id}
+                    isBlockSelected={blockSelection.isSelected(child.id)}
+                    onBlockClick={handleBlockClick}
                     onNavigateUp={() => {
                       if (childIndex > 0) pageLineRefs.current.get(folderChildren[childIndex - 1].id)?.focus()
                       else pageLineRefs.current.get(page.id)?.focus()
                     }}
                     onNavigateDown={() => {
-                      if (childIndex < folderChildren.length - 1) pageLineRefs.current.get(folderChildren[childIndex + 1].id)?.focus(0)
-                      else if (index < pages.length - 1) pageLineRefs.current.get(pages[index + 1].id)?.focus(0)
+                      const grandchildren = childPagesMap?.[child.id] ?? []
+                      if (grandchildren.length > 0 && !collapsedIds.has(child.id)) {
+                        pageLineRefs.current.get(grandchildren[0].id)?.focus(0)
+                      } else if (childIndex < folderChildren.length - 1) {
+                        pageLineRefs.current.get(folderChildren[childIndex + 1].id)?.focus(0)
+                      } else if (index < pages.length - 1) {
+                        pageLineRefs.current.get(pages[index + 1].id)?.focus(0)
+                      }
                     }}
                     onUnlinkFromFolder={() => {
                       z.mutate.page.update({ id: child.id, parentPageId: null, folderId: null })
@@ -794,6 +1049,53 @@ export const DayCard = memo(function DayCard({ date, pages: pagesProp = [], proj
                       else pageLineRefs.current.delete(child.id)
                     }}
                   />
+                  {/* Render grandchildren (e.g., meeting transcriptions under @HH:MM) */}
+                  {(() => {
+                    const grandchildren = childPagesMap?.[child.id] ?? []
+                    if (grandchildren.length === 0) return null
+                    return (
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateRows: collapsedIds.has(child.id) ? '0fr' : '1fr',
+                        // FIX #10: Removed expensive grid-template-rows transition
+                      }}>
+                      <div style={{ overflow: 'hidden' }}>
+                      {grandchildren.map((gc, gcIndex) => (
+                        <PageLine
+                          key={gc.id}
+                          page={gc as any}
+                          dailyDate={date}
+                          onUpdate={handleUpdatePage}
+                          onDelete={() => {
+                            if (gcIndex > 0) setFocusPageId(grandchildren[gcIndex - 1].id)
+                            else setFocusPageId(child.id)
+                            z.mutate.page.delete({ id: gc.id })
+                          }}
+                          autoFocus={focusPageId === gc.id}
+                          focusCursorPosition={focusPageId === gc.id ? focusCursorPos : undefined}
+                          indentOffset={2}
+                          onDragStart={handleDragStart}
+                          onDragEnd={handleDragEnd}
+                          isDragging={draggedPageId === gc.id}
+                          onNavigateUp={() => {
+                            if (gcIndex > 0) pageLineRefs.current.get(grandchildren[gcIndex - 1].id)?.focus()
+                            else pageLineRefs.current.get(child.id)?.focus()
+                          }}
+                          onNavigateDown={() => {
+                            if (gcIndex < grandchildren.length - 1) pageLineRefs.current.get(grandchildren[gcIndex + 1].id)?.focus(0)
+                            else if (childIndex < folderChildren.length - 1) pageLineRefs.current.get(folderChildren[childIndex + 1].id)?.focus(0)
+                            else if (index < pages.length - 1) pageLineRefs.current.get(pages[index + 1].id)?.focus(0)
+                          }}
+                          ref={(el: PageLineHandle | null) => {
+                            if (el) pageLineRefs.current.set(gc.id, el)
+                            else pageLineRefs.current.delete(gc.id)
+                          }}
+                        />
+                      ))}
+                      </div>
+                      </div>
+                    )
+                  })()}
                   </div>
                 ))}
                 {/* Drop indicator after last folder child */}

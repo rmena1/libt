@@ -5,6 +5,7 @@ import { type Folder } from '@/lib/db'
 import { type ZeroPage as Page } from '@/zero/hooks'
 import { useToast } from '@/components/providers/toast-provider'
 import { useMobileToolbar } from '@/components/providers/mobile-toolbar-provider'
+import { useBlockSelection } from '@/components/providers/block-selection-provider'
 import { cn, debounce, parseTaskDate, parseTaskPriority, getPriorityInfo, isOverdue, isTaskToday, formatDateDisplay } from '@/lib/utils'
 import { FolderAutocomplete, getFilteredFolders } from './folder-autocomplete'
 
@@ -82,6 +83,9 @@ interface PageLineProps {
   onDragStart?: (e: React.DragEvent, pageId: string) => void
   onDragEnd?: (e: React.DragEvent) => void
   isDragging?: boolean
+  // Block selection
+  isBlockSelected?: boolean
+  onBlockClick?: (e: React.MouseEvent, pageId: string) => void
 }
 
 export const PageLine = memo(forwardRef<PageLineHandle, PageLineProps>(function PageLine({
@@ -110,6 +114,8 @@ export const PageLine = memo(forwardRef<PageLineHandle, PageLineProps>(function 
   onDragStart,
   onDragEnd,
   isDragging = false,
+  isBlockSelected = false,
+  onBlockClick,
 }, ref) {
   const [content, setContent] = useState(page.content)
   const [indent, setIndent] = useState(page.indent ?? 0)
@@ -122,6 +128,7 @@ export const PageLine = memo(forwardRef<PageLineHandle, PageLineProps>(function 
   const lastSavedIndent = useRef(page.indent ?? 0)
   const { showError } = useToast()
   const { registerActions, unregisterActions } = useMobileToolbar()
+  const blockSelection = useBlockSelection()
   
   // Folder autocomplete state
   const [showAutocomplete, setShowAutocomplete] = useState(false)
@@ -198,13 +205,25 @@ export const PageLine = memo(forwardRef<PageLineHandle, PageLineProps>(function 
     return getFilteredFolders(allFolders, autocompleteQuery)
   }, [showAutocomplete, allFolders, autocompleteQuery])
   
-  // Auto-resize textarea
+  // Blur textarea when block selection activates (so cursor doesn't linger)
   useEffect(() => {
+    if (blockSelection.isTextDragActive && inputRef.current && document.activeElement === inputRef.current) {
+      inputRef.current.blur()
+    }
+  }, [blockSelection.isTextDragActive])
+
+  // Auto-resize textarea — use callback instead of useEffect to avoid extra render cycle
+  const autoResize = useCallback(() => {
     if (inputRef.current) {
       inputRef.current.style.height = 'auto'
       inputRef.current.style.height = Math.max(inputRef.current.scrollHeight, 28) + 'px'
     }
-  }, [content])
+  }, [])
+  
+  // Resize on mount and when content changes from external source (e.g., Zero sync)
+  useEffect(() => {
+    autoResize()
+  }, [page.content, autoResize])
   
   // Auto-focus with optional cursor position
   useEffect(() => {
@@ -254,10 +273,21 @@ export const PageLine = memo(forwardRef<PageLineHandle, PageLineProps>(function 
     }
   }, [allFolders])
   
+  // FIX #5: Use refs for unstable deps so debouncedSave isn't recreated on every Zero update
+  const pageRef = useRef(page)
+  pageRef.current = page
+  const onUpdateRef = useRef(onUpdate)
+  onUpdateRef.current = onUpdate
+  const dailyDateRef = useRef(dailyDate)
+  dailyDateRef.current = dailyDate
+
   // LOCAL-FIRST: Debounced notification to parent (parent handles sync)
   const debouncedSave = useMemo(
     () => debounce((newContent: string) => {
       if (newContent === lastSavedContent.current) return
+      
+      const currentPage = pageRef.current
+      const currentDailyDate = dailyDateRef.current
       
       // Parse task info
       const parsed = parseTaskContent(newContent)
@@ -268,7 +298,7 @@ export const PageLine = memo(forwardRef<PageLineHandle, PageLineProps>(function 
       if (parsed.isTask) {
         const dateInfo = parseTaskDate(parsed.textContent)
         const priorityInfo = parseTaskPriority(parsed.textContent)
-        taskDate = dateInfo.date ?? dailyDate ?? null
+        taskDate = dateInfo.date ?? currentDailyDate ?? null
         taskPriority = priorityInfo.priority
       }
       
@@ -276,8 +306,8 @@ export const PageLine = memo(forwardRef<PageLineHandle, PageLineProps>(function 
       setIsTaskCompleted(parsed.isTask ? parsed.isCompleted : false)
       
       // Notify parent with updated page (parent queues for sync)
-      onUpdate?.({
-        ...page,
+      onUpdateRef.current?.({
+        ...currentPage,
         content: newContent,
         isTask: parsed.isTask,
         taskCompleted: parsed.isTask ? parsed.isCompleted : false,
@@ -285,8 +315,8 @@ export const PageLine = memo(forwardRef<PageLineHandle, PageLineProps>(function 
         taskPriority,
         updatedAt: Date.now(),
       })
-    }, 300), // Reduced debounce for more responsive feel
-    [page, dailyDate, onUpdate]
+    }, 500), // Debounce saves to reduce Zero sync churn during fast typing
+    [page.id] // stable dependency — only recreate when page identity changes
   )
   
   // Handle checkbox toggle - LOCAL-FIRST
@@ -356,6 +386,10 @@ export const PageLine = memo(forwardRef<PageLineHandle, PageLineProps>(function 
   
   // Handle content change
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    // Clear block selection when user starts typing
+    if (blockSelection.hasSelection()) {
+      blockSelection.clearSelection()
+    }
     const newText = e.target.value
     const cursorPos = e.target.selectionStart
     
@@ -377,6 +411,9 @@ export const PageLine = memo(forwardRef<PageLineHandle, PageLineProps>(function 
     
     setContent(contentToSave)
     debouncedSave(contentToSave)
+    
+    // Auto-resize inline (avoids useEffect re-render cycle)
+    autoResize()
     
     // Check for hashtag at cursor position (in displayed text)
     checkHashtag(newText, cursorPos)
@@ -691,10 +728,20 @@ export const PageLine = memo(forwardRef<PageLineHandle, PageLineProps>(function 
         paddingBottom: '4px',
         paddingLeft: `${(indent + indentOffset) * INDENT_WIDTH + (isProjected ? 8 : 0)}px`,
         transition: 'padding-left 150ms ease-out',
+        ...(isBlockSelected ? {
+          backgroundColor: 'rgba(59, 130, 246, 0.08)',
+          borderLeft: '3px solid rgba(59, 130, 246, 0.5)',
+          marginLeft: '-3px',
+        } : {}),
       }}
       data-indent={indent}
       data-projected={isProjected || undefined}
       data-page-id={page.id}
+      onClick={(e) => {
+        if (onBlockClick) {
+          onBlockClick(e, page.id)
+        }
+      }}
     >
       {/* Drag handle */}
       {!isProjected && onDragStart && (

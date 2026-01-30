@@ -21,6 +21,10 @@ const SCROLL_THRESHOLD = 300
 const MAX_DAYS_LOADED = 21
 const VIRTUALIZATION_WINDOW = 5
 
+// FIX #4: Stable empty array references to avoid defeating memo()
+const EMPTY_PAGES: ZeroPage[] = []
+const EMPTY_TASKS: ZeroPage[] = []
+
 export function DailyNotes({
   initialStartDate,
   initialEndDate,
@@ -40,9 +44,13 @@ export function DailyNotes({
   const todayRef = useRef<HTMLDivElement>(null)
   const dayRefs = useRef<Map<string, HTMLDivElement>>(new Map())
   const isProgrammaticScroll = useRef(false)
+  const isUserScrolling = useRef(false)
+  const scrollEndTimer = useRef<ReturnType<typeof setTimeout>>(null)
+  const pendingViewDate = useRef<string | null>(null)
   const renderedDates = useRef<Set<string>>(new Set())
   
-  const todayDate = today()
+  // FIX #13: Memoize today() — won't change during a session
+  const todayDate = useMemo(() => today(), [])
   
   // === CONSOLIDATED ZERO QUERIES ===
   // Single query for all pages in range (no per-day queries)
@@ -87,6 +95,17 @@ export function DailyNotes({
       ? z.query.page.where('parentPageId', 'IN', parentIds).orderBy('order', 'asc')
       : undefined
   )
+
+  // Grandchildren: children of children (for nested structures like meetings > @HH:MM > transcription)
+  const childIds = useMemo(() => (childPagesRaw ?? []).map(p => p.id), [childPagesRaw])
+  const childIdsKey = childIds.join(',')
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const stableChildIds = useMemo(() => childIds, [childIdsKey])
+  const [grandchildPagesRaw] = useQuery(
+    stableChildIds.length > 0
+      ? z.query.page.where('parentPageId', 'IN', stableChildIds).orderBy('order', 'asc')
+      : undefined
+  )
   
   // === DERIVED DATA (useMemo for performance) ===
   
@@ -123,10 +142,10 @@ export function DailyNotes({
     return map
   }, [projectedTasksRaw])
   
-  // Group child pages by parentPageId
+  // Group child pages + grandchild pages by parentPageId
   const childPagesMap = useMemo(() => {
     const map: Record<string, ZeroPage[]> = {}
-    for (const child of childPagesRaw ?? []) {
+    for (const child of [...(childPagesRaw ?? []), ...(grandchildPagesRaw ?? [])]) {
       const pid = child.parentPageId
       if (pid) {
         if (!map[pid]) map[pid] = []
@@ -134,7 +153,7 @@ export function DailyNotes({
       }
     }
     return map
-  }, [childPagesRaw])
+  }, [childPagesRaw, grandchildPagesRaw])
   
   // Dates that have notes
   const datesWithNotes = useMemo(() => {
@@ -196,7 +215,14 @@ export function DailyNotes({
         }
         if (topEntry) {
           const date = (topEntry.target as HTMLElement).dataset.date
-          if (date) setCurrentViewDate(date)
+          if (date) {
+            // Store pending date — only apply when scroll settles
+            pendingViewDate.current = date
+            // If not actively scrolling (e.g. initial load), apply immediately
+            if (!isUserScrolling.current) {
+              setCurrentViewDate(date)
+            }
+          }
         }
       },
       { root: container, rootMargin: '-10% 0px -70% 0px', threshold: 0 }
@@ -204,6 +230,33 @@ export function DailyNotes({
     dayRefs.current.forEach(el => observer.observe(el))
     return () => observer.disconnect()
   }, [startDate, endDate])
+  
+  // Detect scroll start/end to debounce calendar updates
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+    
+    const handleScrollForDebounce = () => {
+      if (isProgrammaticScroll.current) return
+      isUserScrolling.current = true
+      
+      if (scrollEndTimer.current) clearTimeout(scrollEndTimer.current)
+      scrollEndTimer.current = setTimeout(() => {
+        isUserScrolling.current = false
+        // Apply the last detected date now that scroll settled
+        if (pendingViewDate.current) {
+          setCurrentViewDate(pendingViewDate.current)
+          pendingViewDate.current = null
+        }
+      }, 50)
+    }
+    
+    container.addEventListener('scroll', handleScrollForDebounce, { passive: true })
+    return () => {
+      container.removeEventListener('scroll', handleScrollForDebounce)
+      if (scrollEndTimer.current) clearTimeout(scrollEndTimer.current)
+    }
+  }, [])
   
   const handleDateSelect = useCallback((date: string) => {
     // Mark as programmatic scroll so IntersectionObserver won't fight us
@@ -352,9 +405,9 @@ export function DailyNotes({
             {visibleDates.has(date) ? (
               <DayCard
                 date={date}
-                pages={pagesByDate[date] || []}
-                projectedTasks={projectedTasks[date] || []}
-                overdueTasks={date === todayDate ? (overdueTasksRaw as ZeroPage[] ?? []) : undefined}
+                pages={pagesByDate[date] ?? EMPTY_PAGES}
+                projectedTasks={projectedTasks[date] ?? EMPTY_TASKS}
+                overdueTasks={date === todayDate ? (overdueTasksRaw as ZeroPage[] ?? EMPTY_TASKS) : undefined}
                 allFolders={initialFolders}
                 childPagesMap={childPagesMap}
               />

@@ -1,6 +1,7 @@
 'use client'
 
 import { createContext, useContext, useState, useCallback, useRef, useEffect, type ReactNode } from 'react'
+import { usePageVisibility } from '@/hooks/use-page-visibility'
 
 interface MobileToolbarActions {
   indent: () => void
@@ -34,6 +35,7 @@ export function MobileToolbarProvider({ children }: { children: ReactNode }) {
   const [isVisible, setIsVisible] = useState(false)
   const [elementRect, setElementRect] = useState<ElementRect | null>(null)
   const [isTask, setIsTask] = useState(false)
+  const pageVisible = usePageVisibility()
   
   const registeredElementRef = useRef<HTMLElement | null>(null)
   const actionsRef = useRef<MobileToolbarActions | null>(null)
@@ -41,7 +43,7 @@ export function MobileToolbarProvider({ children }: { children: ReactNode }) {
   const maxViewportHeightRef = useRef<number>(0)
   const lastUserInteractionRef = useRef<number>(0)
   const isIOSSafariRef = useRef<boolean>(false)
-  const rafIdRef = useRef<number | null>(null)
+  const isMobileRef = useRef<boolean>(false)
   
   // Update element rect
   const updateElementRect = useCallback(() => {
@@ -61,14 +63,17 @@ export function MobileToolbarProvider({ children }: { children: ReactNode }) {
     })
   }, [])
   
-  // Detect iOS Safari
+  // Detect iOS Safari & mobile once on mount
   useEffect(() => {
     const ua = navigator.userAgent
     isIOSSafariRef.current = /iPad|iPhone|iPod/.test(ua) && !('MSStream' in window)
+    isMobileRef.current = /Mobi|Android|iPhone|iPad|iPod/i.test(ua) || window.innerWidth < 768
   }, [])
   
-  // Track user interactions
+  // Track user interactions — only on mobile
   useEffect(() => {
+    if (!isMobileRef.current) return
+    
     const handleUserInteraction = () => {
       lastUserInteractionRef.current = Date.now()
     }
@@ -146,34 +151,37 @@ export function MobileToolbarProvider({ children }: { children: ReactNode }) {
       updateElementRect()
     }
   }, [updateElementRect])
-  
-  // Continuous rect updates while visible (for scroll tracking)
+
+  // FIX #1: Replace rAF loop with throttled scroll/resize listener while visible
   useEffect(() => {
-    if (!isVisible) {
-      if (rafIdRef.current) {
-        cancelAnimationFrame(rafIdRef.current)
-        rafIdRef.current = null
-      }
-      return
+    if (!isVisible || !pageVisible) return
+
+    let ticking = false
+    const throttledUpdate = () => {
+      if (ticking) return
+      ticking = true
+      requestAnimationFrame(() => {
+        updateElementRect()
+        ticking = false
+      })
     }
-    
-    const updateLoop = () => {
-      updateElementRect()
-      rafIdRef.current = requestAnimationFrame(updateLoop)
-    }
-    
-    rafIdRef.current = requestAnimationFrame(updateLoop)
-    
+
+    // Update on scroll and resize only (not every frame)
+    window.addEventListener('scroll', throttledUpdate, { passive: true })
+    window.addEventListener('resize', throttledUpdate)
+    // Initial update
+    updateElementRect()
+
     return () => {
-      if (rafIdRef.current) {
-        cancelAnimationFrame(rafIdRef.current)
-        rafIdRef.current = null
-      }
+      window.removeEventListener('scroll', throttledUpdate)
+      window.removeEventListener('resize', throttledUpdate)
     }
-  }, [isVisible, updateElementRect])
+  }, [isVisible, pageVisible, updateElementRect])
   
-  // Listen to viewport changes
+  // FIX #7: Listen to viewport changes — only on mobile, pause when page hidden
   useEffect(() => {
+    if (!isMobileRef.current || !pageVisible) return
+
     let animationFrameId: number | null = null
     
     const handleViewportChange = () => {
@@ -208,7 +216,7 @@ export function MobileToolbarProvider({ children }: { children: ReactNode }) {
       window.removeEventListener('focusout', handleViewportChange)
       window.removeEventListener('scroll', handleViewportChange)
     }
-  }, [checkVisibility])
+  }, [checkVisibility, pageVisible])
   
   const registerActions = useCallback((newActions: MobileToolbarActions, element?: HTMLElement, taskState?: boolean) => {
     if (unregisterTimeoutRef.current) {
