@@ -16,7 +16,7 @@ export interface SessionUser {
  */
 export async function createSession(userId: string): Promise<string> {
   const sessionId = generateId()
-  const expiresAt = new Date(Date.now() + SESSION_DURATION_MS)
+  const expiresAt = Date.now() + SESSION_DURATION_MS
   
   await db.insert(sessions).values({
     id: sessionId,
@@ -30,7 +30,7 @@ export async function createSession(userId: string): Promise<string> {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
-    expires: expiresAt,
+    expires: new Date(expiresAt),
     path: '/',
   })
   
@@ -58,7 +58,7 @@ export async function getSession(): Promise<SessionUser | null> {
     .where(
       and(
         eq(sessions.id, sessionId),
-        gt(sessions.expiresAt, new Date())
+        gt(sessions.expiresAt, Date.now())
       )
     )
     .limit(1)
@@ -106,6 +106,6 @@ export async function destroySession(): Promise<void> {
  */
 export async function cleanupExpiredSessions(): Promise<void> {
   await db.delete(sessions).where(
-    lt(sessions.expiresAt, new Date())
+    lt(sessions.expiresAt, Date.now())
   )
 }

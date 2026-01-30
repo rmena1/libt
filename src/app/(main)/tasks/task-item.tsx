@@ -1,12 +1,12 @@
 'use client'
 
-import { type Page } from '@/lib/db'
-import { updatePage } from '@/lib/actions/pages'
+import { memo } from 'react'
+import { type ZeroPage as Page } from '@/zero/hooks'
+import { useZero } from '@rocicorp/zero/react'
 import { getPriorityInfo, parseTaskDate, isOverdue } from '@/lib/utils'
 import { useToast } from '@/components/providers/toast-provider'
 import Link from 'next/link'
 
-// Task detection regex - same as in page-line.tsx
 const TASK_REGEX = /^\[([ xX]?)\]\s*/
 
 function getTextContent(content: string): string {
@@ -22,8 +22,9 @@ interface TaskItemProps {
   isLast?: boolean
 }
 
-export function TaskItem({ task, onUpdate, onDelete, isOverdue: overdueFlag, isCompleted, isLast }: TaskItemProps) {
+export const TaskItem = memo(function TaskItem({ task, onUpdate, onDelete, isOverdue: overdueFlag, isCompleted, isLast }: TaskItemProps) {
   const { showError } = useToast()
+  const z = useZero()
   
   const textContent = getTextContent(task.content)
   const parsedDate = parseTaskDate(textContent)
@@ -42,157 +43,95 @@ export function TaskItem({ task, onUpdate, onDelete, isOverdue: overdueFlag, isC
       const newCheckbox = newCompleted ? '[x] ' : '[] '
       const newContent = newCheckbox + textContent
       
-      const updated = await updatePage(task.id, {
+      await z.mutate.page.update({
+        id: task.id,
         content: newContent,
         taskCompleted: newCompleted,
       })
       
-      onUpdate(updated)
+      onUpdate({
+        ...task,
+        content: newContent,
+        taskCompleted: newCompleted,
+      })
     } catch (error) {
       console.error('Failed to toggle task:', error)
       showError('Failed to update task.')
     }
   }
 
-  // Priority badge colors - softer, more premium
   const getPriorityStyle = () => {
     if (!priorityInfo || isCompleted) return null
-    
     const styles: Record<string, React.CSSProperties> = {
-      '!!!': {
-        backgroundColor: 'rgba(239, 68, 68, 0.1)',
-        color: '#dc2626',
-        border: '1px solid rgba(239, 68, 68, 0.15)',
-      },
-      '!!': {
-        backgroundColor: 'rgba(245, 158, 11, 0.1)',
-        color: '#d97706',
-        border: '1px solid rgba(245, 158, 11, 0.15)',
-      },
-      '!': {
-        backgroundColor: 'rgba(59, 130, 246, 0.1)',
-        color: '#2563eb',
-        border: '1px solid rgba(59, 130, 246, 0.15)',
-      },
+      '!!!': { backgroundColor: 'rgba(239, 68, 68, 0.1)', color: '#dc2626', border: '1px solid rgba(239, 68, 68, 0.15)' },
+      '!!': { backgroundColor: 'rgba(245, 158, 11, 0.1)', color: '#d97706', border: '1px solid rgba(245, 158, 11, 0.15)' },
+      '!': { backgroundColor: 'rgba(59, 130, 246, 0.1)', color: '#2563eb', border: '1px solid rgba(59, 130, 246, 0.15)' },
     }
-    
     return styles[priorityInfo.label] || null
   }
 
   return (
     <div 
       style={{
-        display: 'flex',
-        alignItems: 'flex-start',
-        gap: '14px',
-        padding: '18px 20px',
+        display: 'flex', alignItems: 'flex-start', gap: '14px', padding: '18px 20px',
         borderBottom: isLast ? 'none' : '1px solid rgba(0, 0, 0, 0.05)',
-        opacity: isCompleted ? 0.5 : 1,
-        transition: 'opacity 200ms ease, background-color 150ms ease',
-        cursor: 'default',
-        backgroundColor: 'transparent',
-        minHeight: '56px',
+        opacity: isCompleted ? 0.5 : 1, transition: 'opacity 200ms ease, background-color 150ms ease',
+        cursor: 'default', backgroundColor: 'transparent', minHeight: '56px',
       }}
     >
-      {/* Apple-style Checkbox */}
       <div
         onClick={handleCheckboxToggle}
         style={{
-          flexShrink: 0,
-          width: '22px',
-          height: '22px',
-          borderRadius: '7px',
-          border: task.taskCompleted 
-            ? 'none' 
-            : taskOverdue 
-              ? '2px solid #ff3b30'
-              : '2px solid #d1d5db',
-          backgroundColor: task.taskCompleted ? '#34c759' : 'transparent',
-          marginTop: '2px',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          transition: 'all 150ms cubic-bezier(0.4, 0, 0.2, 1)',
-          boxShadow: task.taskCompleted 
-            ? '0 1px 3px rgba(52, 199, 89, 0.3)' 
-            : 'inset 0 1px 2px rgba(0, 0, 0, 0.05)',
+          flexShrink: 0, width: '44px', height: '44px',
+          margin: '-11px', marginRight: '-11px',
+          cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          WebkitTapHighlightColor: 'transparent',
         }}
-        role="checkbox"
-        aria-checked={task.taskCompleted}
+        role="checkbox" aria-checked={task.taskCompleted}
       >
+        <div style={{
+          width: '22px', height: '22px', borderRadius: '7px',
+          border: task.taskCompleted ? 'none' : taskOverdue ? '2px solid #ff3b30' : '2px solid #d1d5db',
+          backgroundColor: task.taskCompleted ? '#34c759' : 'transparent',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          transition: 'all 150ms cubic-bezier(0.4, 0, 0.2, 1)',
+          boxShadow: task.taskCompleted ? '0 1px 3px rgba(52, 199, 89, 0.3)' : 'inset 0 1px 2px rgba(0, 0, 0, 0.05)',
+        }}>
         {task.taskCompleted && (
           <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-            <path 
-              d="M2.5 6.5L5.5 9.5L10.5 3.5" 
-              stroke="white" 
-              strokeWidth="2.5" 
-              strokeLinecap="round" 
-              strokeLinejoin="round"
-            />
+            <path d="M2.5 6.5L5.5 9.5L10.5 3.5" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         )}
+        </div>
       </div>
       
-      {/* Content */}
       <div style={{ flex: 1, minWidth: 0 }}>
-        {/* First row: task text + priority badge */}
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-          {/* Task text */}
           <span style={{
-            fontSize: '16px',
-            lineHeight: '24px',
+            fontSize: '16px', lineHeight: '24px',
             color: isCompleted ? '#9ca3af' : '#1f2937',
             textDecoration: isCompleted ? 'line-through' : 'none',
-            wordBreak: 'break-word',
-            fontWeight: 400,
-            letterSpacing: '-0.01em',
-            flex: 1,
+            wordBreak: 'break-word', fontWeight: 400, letterSpacing: '-0.01em', flex: 1,
           }}>
             {parsedDate.cleanedContent}
           </span>
           
-          {/* Priority badge - inline with text */}
           {priorityInfo && !isCompleted && (
-            <span style={{ 
-              flexShrink: 0,
-              fontSize: '11px',
-              fontWeight: 700,
-              padding: '3px 8px',
-              borderRadius: '6px',
-              letterSpacing: '0.02em',
-              marginTop: '3px',
-              ...getPriorityStyle(),
-            }}>
+            <span style={{ flexShrink: 0, fontSize: '11px', fontWeight: 700, padding: '3px 8px', borderRadius: '6px', letterSpacing: '0.02em', marginTop: '3px', ...getPriorityStyle() }}>
               {priorityInfo.label}
             </span>
           )}
         </div>
         
-        {/* Second row: date and source */}
         {(displayDate || task.dailyDate) && (
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px',
-            marginTop: '8px',
-          }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '8px' }}>
             {displayDate && (
               <span style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '5px',
-                fontSize: '12px',
-                fontWeight: 500,
-                padding: '3px 10px',
-                borderRadius: '6px',
+                display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '12px', fontWeight: 500,
+                padding: '3px 10px', borderRadius: '6px',
                 color: taskOverdue && !isCompleted ? '#dc2626' : '#6b7280',
-                backgroundColor: taskOverdue && !isCompleted 
-                  ? 'rgba(220, 38, 38, 0.08)' 
-                  : 'rgba(107, 114, 128, 0.08)',
-                border: taskOverdue && !isCompleted
-                  ? '1px solid rgba(220, 38, 38, 0.1)'
-                  : '1px solid transparent',
+                backgroundColor: taskOverdue && !isCompleted ? 'rgba(220, 38, 38, 0.08)' : 'rgba(107, 114, 128, 0.08)',
+                border: taskOverdue && !isCompleted ? '1px solid rgba(220, 38, 38, 0.1)' : '1px solid transparent',
               }}>
                 {taskOverdue && !isCompleted && (
                   <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -205,17 +144,13 @@ export function TaskItem({ task, onUpdate, onDelete, isOverdue: overdueFlag, isC
             )}
             
             {task.dailyDate && (
-              <Link 
-                href={`/daily?date=${task.dailyDate}`}
-                style={{
-                  fontSize: '12px',
-                  color: '#9ca3af',
-                  textDecoration: 'none',
-                  transition: 'color 150ms ease',
-                  padding: '3px 0',
-                }}
-              >
-                ↗ {task.dailyDate}
+              <Link href={`/daily?date=${task.dailyDate}`}
+                style={{ fontSize: '12px', color: '#9ca3af', textDecoration: 'none', padding: '3px 0', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                title={`View in daily notes (${task.dailyDate})`}>
+                <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                {task.dailyDate === task.taskDate ? 'Daily' : formatTaskDate(task.dailyDate)}
               </Link>
             )}
           </div>
@@ -223,29 +158,21 @@ export function TaskItem({ task, onUpdate, onDelete, isOverdue: overdueFlag, isC
       </div>
     </div>
   )
-}
+})
 
 function formatTaskDate(dateStr: string): string {
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Santiago' })
-  
   if (dateStr === today) return 'Today'
   
   const tomorrow = new Date()
   tomorrow.setDate(tomorrow.getDate() + 1)
-  const tomorrowStr = tomorrow.toLocaleDateString('en-CA', { timeZone: 'America/Santiago' })
-  if (dateStr === tomorrowStr) return 'Tomorrow'
+  if (dateStr === tomorrow.toLocaleDateString('en-CA', { timeZone: 'America/Santiago' })) return 'Tomorrow'
   
   const yesterday = new Date()
   yesterday.setDate(yesterday.getDate() - 1)
-  const yesterdayStr = yesterday.toLocaleDateString('en-CA', { timeZone: 'America/Santiago' })
-  if (dateStr === yesterdayStr) return 'Yesterday'
+  if (dateStr === yesterday.toLocaleDateString('en-CA', { timeZone: 'America/Santiago' })) return 'Yesterday'
   
   const [year, month, day] = dateStr.split('-').map(Number)
   const date = new Date(year, month - 1, day)
-  
-  return date.toLocaleDateString('en-US', { 
-    month: 'short', 
-    day: 'numeric',
-    timeZone: 'America/Santiago'
-  })
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/Santiago' })
 }

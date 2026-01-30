@@ -1,27 +1,27 @@
-import { sqliteTable, text, integer, index, uniqueIndex } from 'drizzle-orm/sqlite-core'
+import { pgTable, text, integer, bigint, boolean, index, uniqueIndex } from 'drizzle-orm/pg-core'
 
 // ============================================================================
 // USERS
 // ============================================================================
-export const users = sqliteTable('users', {
+export const users = pgTable('users', {
   id: text('id').primaryKey(), // nanoid
   email: text('email').notNull().unique(),
   passwordHash: text('password_hash').notNull(),
   googleRefreshToken: text('google_refresh_token'),
   googleAccessToken: text('google_access_token'),
   googleTokenExpiry: integer('google_token_expiry'), // unix timestamp in seconds
-  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
-  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+  createdAt: bigint('created_at', { mode: 'number' }).notNull().$defaultFn(() => Date.now()),
+  updatedAt: bigint('updated_at', { mode: 'number' }).notNull().$defaultFn(() => Date.now()),
 })
 
 // ============================================================================
 // SESSIONS (for auth)
 // ============================================================================
-export const sessions = sqliteTable('sessions', {
+export const sessions = pgTable('sessions', {
   id: text('id').primaryKey(), // session token
   userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
-  expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
-  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+  expiresAt: bigint('expires_at', { mode: 'number' }).notNull(),
+  createdAt: bigint('created_at', { mode: 'number' }).notNull().$defaultFn(() => Date.now()),
 }, (table) => [
   index('idx_sessions_user').on(table.userId),
   index('idx_sessions_expires').on(table.expiresAt),
@@ -30,15 +30,15 @@ export const sessions = sqliteTable('sessions', {
 // ============================================================================
 // FOLDERS
 // ============================================================================
-export const folders = sqliteTable('folders', {
+export const folders = pgTable('folders', {
   id: text('id').primaryKey(), // nanoid
   userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   name: text('name').notNull(),
   slug: text('slug').notNull(), // URL-safe version
-  parentId: text('parent_id').references((): ReturnType<typeof text> => folders.id, { onDelete: 'cascade' }),
+  parentId: text('parent_id').references((): any => folders.id, { onDelete: 'cascade' }),
   order: integer('order').notNull().default(0),
-  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
-  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+  createdAt: bigint('created_at', { mode: 'number' }).notNull().$defaultFn(() => Date.now()),
+  updatedAt: bigint('updated_at', { mode: 'number' }).notNull().$defaultFn(() => Date.now()),
 }, (table) => [
   index('idx_folders_user').on(table.userId),
   index('idx_folders_parent').on(table.parentId),
@@ -48,7 +48,7 @@ export const folders = sqliteTable('folders', {
 // ============================================================================
 // PAGES
 // ============================================================================
-export const pages = sqliteTable('pages', {
+export const pages = pgTable('pages', {
   id: text('id').primaryKey(), // nanoid
   userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   
@@ -59,22 +59,22 @@ export const pages = sqliteTable('pages', {
   // Hierarchy
   dailyDate: text('daily_date'), // YYYY-MM-DD if part of daily note
   folderId: text('folder_id').references(() => folders.id, { onDelete: 'set null' }),
-  parentPageId: text('parent_page_id').references((): ReturnType<typeof text> => pages.id, { onDelete: 'cascade' }),
+  parentPageId: text('parent_page_id').references((): any => pages.id, { onDelete: 'cascade' }),
   order: integer('order').notNull().default(0),
   
   // Task fields
-  isTask: integer('is_task', { mode: 'boolean' }).notNull().default(false),
-  taskCompleted: integer('task_completed', { mode: 'boolean' }).notNull().default(false),
-  taskCompletedAt: integer('task_completed_at', { mode: 'timestamp' }),
+  isTask: boolean('is_task').notNull().default(false),
+  taskCompleted: boolean('task_completed').notNull().default(false),
+  taskCompletedAt: bigint('task_completed_at', { mode: 'number' }),
   taskDate: text('task_date'), // YYYY-MM-DD for task due date
-  taskPriority: text('task_priority', { enum: ['low', 'medium', 'high'] }),
+  taskPriority: text('task_priority'), // 'low' | 'medium' | 'high'
   
   // Starred (favorites)
-  starred: integer('starred', { mode: 'boolean' }).notNull().default(false),
+  starred: boolean('starred').notNull().default(false),
   
   // Timestamps
-  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
-  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+  createdAt: bigint('created_at', { mode: 'number' }).notNull().$defaultFn(() => Date.now()),
+  updatedAt: bigint('updated_at', { mode: 'number' }).notNull().$defaultFn(() => Date.now()),
 }, (table) => [
   index('idx_pages_user_daily').on(table.userId, table.dailyDate),
   index('idx_pages_user_folder').on(table.userId, table.folderId),

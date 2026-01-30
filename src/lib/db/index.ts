@@ -1,24 +1,18 @@
-import Database from 'better-sqlite3'
-import { drizzle } from 'drizzle-orm/better-sqlite3'
+import pg from 'pg'
+import { drizzle } from 'drizzle-orm/node-postgres'
 import * as schema from './schema'
-import path from 'path'
 
-// Database file location
-const DB_PATH = process.env.DATABASE_URL || path.join(process.cwd(), 'data', 'libt.db')
+const DATABASE_URL = process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/libt'
 
-// Create database connection (singleton pattern for serverless)
+// Create database connection (singleton pattern)
 let _db: ReturnType<typeof createDb> | null = null
 
 function createDb() {
-  const sqlite = new Database(DB_PATH)
-  
-  // Enable WAL mode for better concurrent access
-  sqlite.pragma('journal_mode = WAL')
-  
-  // Enable foreign keys
-  sqlite.pragma('foreign_keys = ON')
-  
-  return drizzle(sqlite, { schema })
+  const pool = new pg.Pool({
+    connectionString: DATABASE_URL,
+  })
+
+  return drizzle(pool, { schema })
 }
 
 export function getDb() {

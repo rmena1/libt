@@ -293,7 +293,7 @@ export async function renameFolder(folderId: string, name: string): Promise<Fold
     .set({
       name: name.trim(),
       slug: finalSlug,
-      updatedAt: new Date(),
+      updatedAt: Date.now(),
     })
     .where(
       and(
@@ -353,7 +353,7 @@ export async function deleteFolder(folderId: string): Promise<void> {
   for (const id of allFolderIds) {
     await db
       .update(pages)
-      .set({ folderId: null, updatedAt: new Date() })
+      .set({ folderId: null, updatedAt: Date.now() })
       .where(
         and(
           eq(pages.userId, session.id),
@@ -386,7 +386,7 @@ export async function movePageToFolder(pageId: string, folderId: string | null):
     .update(pages)
     .set({
       folderId: folderId,
-      updatedAt: new Date(),
+      updatedAt: Date.now(),
     })
     .where(
       and(

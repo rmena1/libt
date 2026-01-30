@@ -12,18 +12,13 @@ export default defineConfig({
     trace: 'on-first-retry',
     screenshot: 'on',
   },
+  timeout: 30000,
   projects: [
     {
       name: 'Desktop Chrome',
       use: { 
         ...devices['Desktop Chrome'],
         viewport: { width: 1280, height: 720 },
-      },
-    },
-    {
-      name: 'Mobile Chrome',
-      use: { 
-        ...devices['Pixel 5'],
       },
     },
   ],

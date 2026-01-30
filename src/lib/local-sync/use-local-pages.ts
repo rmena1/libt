@@ -143,7 +143,7 @@ export function useLocalPages({ dailyDate }: UseLocalPagesOptions): UseLocalPage
 
   // Create page - optimistic
   const createPage = useCallback((data: { content?: string; indent?: number; order?: number }): Page => {
-    const now = new Date()
+    const now = Date.now()
     const newPage: Page = {
       id: generateId(),
       userId: '', // Will be set by server
@@ -203,7 +203,7 @@ export function useLocalPages({ dailyDate }: UseLocalPagesOptions): UseLocalPage
     // 1. Update local state immediately
     setPages(prev => {
       const updated = prev.map(p => 
-        p.id === id ? { ...p, ...data, updatedAt: new Date() } : p
+        p.id === id ? { ...p, ...data, updatedAt: Date.now() } : p
       )
       
       // Update cache

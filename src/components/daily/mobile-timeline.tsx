@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useEffect, useMemo } from 'react'
+import { useRef, useEffect, useMemo, useState } from 'react'
 import { cn, today, addDays } from '@/lib/utils'
 
 interface MobileTimelineProps {
@@ -29,14 +29,19 @@ export function MobileTimeline({ currentDate, datesWithNotes, onDateSelect }: Mo
     return result
   }, [currentDate])
 
-  // Scroll to selected date
+  // Track previous date to distinguish user tap (handled in onClick) from scroll-detected changes
+  const prevDateRef = useRef(currentDate)
+  
+  // Scroll the horizontal timeline to show the selected date pill,
+  // but use 'instant' to avoid visual jank during rapid scroll detection
   useEffect(() => {
-    if (selectedRef.current && scrollRef.current) {
+    if (prevDateRef.current !== currentDate && selectedRef.current && scrollRef.current) {
       const container = scrollRef.current
       const el = selectedRef.current
       const left = el.offsetLeft - container.clientWidth / 2 + el.clientWidth / 2
-      container.scrollTo({ left, behavior: 'smooth' })
+      container.scrollTo({ left, behavior: 'instant' })
     }
+    prevDateRef.current = currentDate
   }, [currentDate])
 
   const [cy, cm] = currentDate.split('-').map(Number)

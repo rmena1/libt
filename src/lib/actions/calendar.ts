@@ -60,7 +60,7 @@ export async function handleGoogleCallback(code: string): Promise<{ success: boo
     googleAccessToken: data.access_token,
     googleRefreshToken: data.refresh_token || null,
     googleTokenExpiry: expiresAt,
-    updatedAt: new Date(),
+    updatedAt: Date.now(),
   }).where(eq(users.id, session.id))
 
   return { success: true }
@@ -72,7 +72,7 @@ export async function disconnectGoogle(): Promise<void> {
     googleAccessToken: null,
     googleRefreshToken: null,
     googleTokenExpiry: null,
-    updatedAt: new Date(),
+    updatedAt: Date.now(),
   }).where(eq(users.id, session.id))
   revalidatePath('/')
 }
@@ -122,7 +122,7 @@ async function getValidAccessToken(userId: string): Promise<string | null> {
   await db.update(users).set({
     googleAccessToken: data.access_token,
     googleTokenExpiry: expiresAt,
-    updatedAt: new Date(),
+    updatedAt: Date.now(),
   }).where(eq(users.id, userId))
 
   return data.access_token
@@ -133,8 +133,33 @@ export async function getCalendarEvents(dateStr: string): Promise<CalendarEvent[
   const accessToken = await getValidAccessToken(session.id)
   if (!accessToken) return []
 
-  const timeMin = new Date(dateStr + 'T00:00:00').toISOString()
-  const timeMax = new Date(dateStr + 'T23:59:59').toISOString()
+  // Parse date in the user's timezone (America/Santiago) to get correct UTC boundaries
+  // dateStr is YYYY-MM-DD; we need the start/end of that day in Chile time
+  const [year, month, day] = dateStr.split('-').map(Number)
+  // Create a date formatter that gives us the UTC offset for the target date in Chile
+  const tzDate = new Date(Date.UTC(year, month - 1, day, 12, 0, 0)) // noon UTC as reference
+  const chileFmt = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Santiago',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hour12: false,
+    timeZoneName: 'longOffset',
+  })
+  // Extract the UTC offset for this date in Chile (handles DST correctly)
+  const parts = chileFmt.formatToParts(tzDate)
+  const offsetPart = parts.find(p => p.type === 'timeZoneName')?.value ?? 'GMT-03:00'
+  // offsetPart looks like "GMT-03:00" or "GMT-04:00"
+  const offsetMatch = offsetPart.match(/GMT([+-])(\d{2}):(\d{2})/)
+  let offsetMinutes = 0
+  if (offsetMatch) {
+    const sign = offsetMatch[1] === '+' ? 1 : -1
+    offsetMinutes = sign * (parseInt(offsetMatch[2]) * 60 + parseInt(offsetMatch[3]))
+  }
+  // Start of day in Chile = midnight Chile time = midnight - offset in UTC
+  const startUtc = new Date(Date.UTC(year, month - 1, day, 0, 0, 0) - offsetMinutes * 60000)
+  const endUtc = new Date(Date.UTC(year, month - 1, day, 23, 59, 59) - offsetMinutes * 60000)
+  const timeMin = startUtc.toISOString()
+  const timeMax = endUtc.toISOString()
 
   const params = new URLSearchParams({
     timeMin,

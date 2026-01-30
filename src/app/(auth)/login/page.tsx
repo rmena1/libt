@@ -31,8 +31,8 @@ export default function LoginPage() {
     width: '100%',
     height: '52px',
     borderRadius: '12px',
-    border: '1px solid rgba(0, 0, 0, 0.08)',
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    border: '1px solid rgba(0, 0, 0, 0.15)',
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
     fontSize: '16px',
     color: '#1a1a1a',
     outline: 'none',
@@ -110,7 +110,7 @@ export default function LoginPage() {
           <p
             style={{
               fontSize: '15px',
-              color: '#8e8e93',
+              color: '#6e6e73',
               marginTop: '8px',
               lineHeight: 1.5,
             }}
@@ -254,7 +254,7 @@ export default function LoginPage() {
           style={{
             textAlign: 'center',
             fontSize: '14px',
-            color: '#8e8e93',
+            color: '#6e6e73',
             marginTop: '28px',
             lineHeight: 1.5,
           }}

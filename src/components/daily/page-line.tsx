@@ -1,13 +1,12 @@
 'use client'
 
-import { useState, useRef, useEffect, useMemo, useCallback, forwardRef, useImperativeHandle } from 'react'
-import { type Page, type Folder } from '@/lib/db'
-import { updatePage, deletePage, togglePageStarred } from '@/lib/actions/pages'
+import { useState, useRef, useEffect, useMemo, useCallback, forwardRef, useImperativeHandle, memo } from 'react'
+import { type Folder } from '@/lib/db'
+import { type ZeroPage as Page } from '@/zero/hooks'
 import { useToast } from '@/components/providers/toast-provider'
 import { useMobileToolbar } from '@/components/providers/mobile-toolbar-provider'
 import { cn, debounce, parseTaskDate, parseTaskPriority, getPriorityInfo, isOverdue, isTaskToday, formatDateDisplay } from '@/lib/utils'
 import { FolderAutocomplete, getFilteredFolders } from './folder-autocomplete'
-import Link from 'next/link'
 
 const MAX_INDENT = 4
 const INDENT_WIDTH = 24 // pixels per indent level
@@ -74,9 +73,18 @@ interface PageLineProps {
   onMergeWithPrevious?: (currentIndex: number, currentDisplayedContent: string) => void // Merge with previous line
   onNavigateUp?: () => void // Navigate to previous line
   onNavigateDown?: () => void // Navigate to next line
+  onUnlinkFromFolder?: () => void // Called when Shift+Tab on a folder child at indent 0
+  onIndent?: (newIndent: number) => void // Called after indent changes, parent can link to folder
+  hasChildren?: boolean // Whether this line has collapsible children
+  isCollapsed?: boolean // Whether children are currently collapsed
+  onToggleCollapse?: () => void // Toggle collapse state
+  // Drag and drop
+  onDragStart?: (e: React.DragEvent, pageId: string) => void
+  onDragEnd?: (e: React.DragEvent) => void
+  isDragging?: boolean
 }
 
-export const PageLine = forwardRef<PageLineHandle, PageLineProps>(function PageLine({
+export const PageLine = memo(forwardRef<PageLineHandle, PageLineProps>(function PageLine({
   page,
   dailyDate,
   onUpdate,
@@ -94,6 +102,14 @@ export const PageLine = forwardRef<PageLineHandle, PageLineProps>(function PageL
   onMergeWithPrevious,
   onNavigateUp,
   onNavigateDown,
+  onUnlinkFromFolder,
+  onIndent,
+  hasChildren = false,
+  isCollapsed = false,
+  onToggleCollapse,
+  onDragStart,
+  onDragEnd,
+  isDragging = false,
 }, ref) {
   const [content, setContent] = useState(page.content)
   const [indent, setIndent] = useState(page.indent ?? 0)
@@ -267,7 +283,7 @@ export const PageLine = forwardRef<PageLineHandle, PageLineProps>(function PageL
         taskCompleted: parsed.isTask ? parsed.isCompleted : false,
         taskDate,
         taskPriority,
-        updatedAt: new Date(),
+        updatedAt: Date.now(),
       })
     }, 300), // Reduced debounce for more responsive feel
     [page, dailyDate, onUpdate]
@@ -291,8 +307,8 @@ export const PageLine = forwardRef<PageLineHandle, PageLineProps>(function PageL
       content: newContent,
       isTask: true,
       taskCompleted: newCompleted,
-      taskCompletedAt: newCompleted ? new Date() : null,
-      updatedAt: new Date(),
+      taskCompletedAt: newCompleted ? Date.now() : null,
+      updatedAt: Date.now(),
     })
   }
   
@@ -333,7 +349,7 @@ export const PageLine = forwardRef<PageLineHandle, PageLineProps>(function PageL
       ...page,
       content: newContent,
       folderId: folder.id,
-      updatedAt: new Date(),
+      updatedAt: Date.now(),
     })
     onFolderTag?.(page.id, folder.id)
   }, [content, taskInfo, isTaskCompleted, page, debouncedSave, onUpdate, onFolderTag])
@@ -373,7 +389,7 @@ export const PageLine = forwardRef<PageLineHandle, PageLineProps>(function PageL
     onUpdate?.({
       ...page,
       indent: newIndent,
-      updatedAt: new Date(),
+      updatedAt: Date.now(),
     })
   }
   
@@ -383,20 +399,26 @@ export const PageLine = forwardRef<PageLineHandle, PageLineProps>(function PageL
       const newIndent = Math.min(prev + 1, MAX_INDENT)
       if (newIndent !== prev) {
         saveIndent(newIndent)
+        onIndent?.(newIndent)
       }
       return newIndent
     })
-  }, [])
+  }, [onIndent])
   
   const handleOutdent = useCallback(() => {
     setIndent(prev => {
+      if (prev === 0 && onUnlinkFromFolder) {
+        // Already at indent 0 but is a folder child — unlink from folder
+        onUnlinkFromFolder()
+        return prev
+      }
       const newIndent = Math.max(prev - 1, 0)
       if (newIndent !== prev) {
         saveIndent(newIndent)
       }
       return newIndent
     })
-  }, [])
+  }, [onUnlinkFromFolder])
   
   const handleBlurAction = useCallback(() => {
     inputRef.current?.blur()
@@ -425,7 +447,7 @@ export const PageLine = forwardRef<PageLineHandle, PageLineProps>(function PageL
       taskCompleted: false,
       taskDate: newIsTask ? (dailyDate ?? null) : null,
       taskPriority: null,
-      updatedAt: new Date(),
+      updatedAt: Date.now(),
     })
   }, [content, taskInfo.isTask, page, dailyDate, onUpdate])
   
@@ -521,11 +543,13 @@ export const PageLine = forwardRef<PageLineHandle, PageLineProps>(function PageL
         }
         setContent(newContent)
         debouncedSave.cancel()
-        // Save truncated content immediately
-        updatePage(page.id, { content: newContent }).then(updated => {
-          lastSavedContent.current = newContent
-          onUpdate?.(updated)
-        }).catch(err => console.error('Failed to save split:', err))
+        // Save truncated content immediately via parent callback (Zero mutate)
+        lastSavedContent.current = newContent
+        onUpdate?.({
+          ...page,
+          content: newContent,
+          updatedAt: Date.now(),
+        })
       }
       
       // Create new line with the remainder text (or empty)
@@ -566,7 +590,7 @@ export const PageLine = forwardRef<PageLineHandle, PageLineProps>(function PageL
     onUpdate?.({
       ...page,
       starred: newStarred,
-      updatedAt: new Date(),
+      updatedAt: Date.now(),
     })
   }
   
@@ -656,7 +680,8 @@ export const PageLine = forwardRef<PageLineHandle, PageLineProps>(function PageL
     <div 
       className={cn(
         "group relative flex py-1",
-        isProjected && "bg-blue-50/50 rounded-md -mx-2 px-2"
+        isProjected && "bg-blue-50/50 rounded-md -mx-2 px-2",
+        isDragging && "opacity-40"
       )}
       style={{ 
         display: 'flex', 
@@ -669,7 +694,36 @@ export const PageLine = forwardRef<PageLineHandle, PageLineProps>(function PageL
       }}
       data-indent={indent}
       data-projected={isProjected || undefined}
+      data-page-id={page.id}
     >
+      {/* Drag handle */}
+      {!isProjected && onDragStart && (
+        <div
+          draggable
+          onDragStart={(e) => onDragStart(e, page.id)}
+          onDragEnd={onDragEnd}
+          className="drag-handle flex-shrink-0 opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing transition-opacity touch-none"
+          style={{
+            width: '16px',
+            marginTop: '6px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#9ca3af',
+            userSelect: 'none',
+          }}
+          title="Drag to reorder"
+        >
+          <svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor">
+            <circle cx="3" cy="2" r="1.5" />
+            <circle cx="7" cy="2" r="1.5" />
+            <circle cx="3" cy="8" r="1.5" />
+            <circle cx="7" cy="8" r="1.5" />
+            <circle cx="3" cy="14" r="1.5" />
+            <circle cx="7" cy="14" r="1.5" />
+          </svg>
+        </div>
+      )}
       {/* Bullet point OR Checkbox - vertically centered with first line of text */}
       {taskInfo.isTask ? (
         // Checkbox for tasks
@@ -717,7 +771,39 @@ export const PageLine = forwardRef<PageLineHandle, PageLineProps>(function PageL
           )}
         </div>
       ) : (
-        // Regular bullet point
+        // Regular bullet point (clickable if has children)
+        hasChildren ? (
+          <button
+            onClick={(e) => { e.stopPropagation(); onToggleCollapse?.() }}
+            style={{
+              flexShrink: 0,
+              width: '16px',
+              height: '16px',
+              marginTop: '6px',
+              cursor: 'pointer',
+              background: 'none',
+              border: 'none',
+              padding: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'transform 200ms ease',
+              transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)',
+            }}
+            aria-label={isCollapsed ? 'Expand' : 'Collapse'}
+            tabIndex={-1}
+          >
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+              <path
+                d="M2.5 3.5L5 6.5L7.5 3.5"
+                stroke={indent > 0 ? '#9ca3af' : '#6b7280'}
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
+        ) : (
         <div 
           style={{
             flexShrink: 0,
@@ -729,6 +815,7 @@ export const PageLine = forwardRef<PageLineHandle, PageLineProps>(function PageL
           }}
           className="group-focus-within:bg-gray-400 transition-colors" 
         />
+        )
       )}
       
       {/* Content */}
@@ -847,7 +934,7 @@ export const PageLine = forwardRef<PageLineHandle, PageLineProps>(function PageL
                       lineHeight: '18px',
                     }}
                   >
-                    <Link
+                    <a
                       href={`/folders/${matchedFolder.slug}`}
                       style={{
                         color: 'inherit',
@@ -862,7 +949,7 @@ export const PageLine = forwardRef<PageLineHandle, PageLineProps>(function PageL
                         <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
                       </svg>
                       {matchedFolder.name}
-                    </Link>
+                    </a>
                     <button
                       onClick={(e) => {
                         e.stopPropagation()
@@ -871,7 +958,7 @@ export const PageLine = forwardRef<PageLineHandle, PageLineProps>(function PageL
                         onUpdate?.({
                           ...page,
                           folderId: null,
-                          updatedAt: new Date(),
+                          updatedAt: Date.now(),
                         })
                       }}
                       style={{
@@ -977,4 +1064,4 @@ export const PageLine = forwardRef<PageLineHandle, PageLineProps>(function PageL
       </div>
     </div>
   )
-})
+}))

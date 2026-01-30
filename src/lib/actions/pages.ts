@@ -64,7 +64,9 @@ export async function getDailyPagesRange(startDate: string, endDate: string): Pr
     .where(
       and(
         eq(pages.userId, session.id),
-        isNull(pages.parentPageId) // Only top-level pages
+        isNull(pages.parentPageId), // Only top-level pages
+        sql`${pages.dailyDate} >= ${startDate}`,
+        sql`${pages.dailyDate} <= ${endDate}`
       )
     )
     .orderBy(asc(pages.dailyDate), asc(pages.order), asc(pages.createdAt))
@@ -73,7 +75,7 @@ export async function getDailyPagesRange(startDate: string, endDate: string): Pr
   const grouped: Record<string, Page[]> = {}
   
   for (const page of result) {
-    if (page.dailyDate && page.dailyDate >= startDate && page.dailyDate <= endDate) {
+    if (page.dailyDate) {
       if (!grouped[page.dailyDate]) {
         grouped[page.dailyDate] = []
       }
@@ -117,27 +119,26 @@ export async function getProjectedTasksForDate(targetDate: string): Promise<Page
 export async function getProjectedTasksForRange(startDate: string, endDate: string): Promise<Record<string, Page[]>> {
   const session = await requireAuth()
   
-  // Get all tasks where taskDate is within range but dailyDate is different from taskDate
+  // Get tasks where taskDate is within range and different from dailyDate
   const result = await db
     .select()
     .from(pages)
     .where(
       and(
         eq(pages.userId, session.id),
-        eq(pages.isTask, true)
+        eq(pages.isTask, true),
+        sql`${pages.taskDate} >= ${startDate}`,
+        sql`${pages.taskDate} <= ${endDate}`,
+        sql`${pages.taskDate} != ${pages.dailyDate}`
       )
     )
     .orderBy(asc(pages.taskDate), asc(pages.taskPriority), asc(pages.createdAt))
   
-  // Group by taskDate where taskDate != dailyDate and taskDate is in range
+  // Group by taskDate
   const grouped: Record<string, Page[]> = {}
   
   for (const page of result) {
-    // Only include if taskDate is in range and different from dailyDate
-    if (page.taskDate && 
-        page.taskDate >= startDate && 
-        page.taskDate <= endDate && 
-        page.taskDate !== page.dailyDate) {
+    if (page.taskDate) {
       if (!grouped[page.taskDate]) {
         grouped[page.taskDate] = []
       }
@@ -255,7 +256,7 @@ export async function linkDailyVisualChildren(parentPageId: string): Promise<Pag
       .set({
         parentPageId: parentPageId,
         folderId: parent.folderId,
-        updatedAt: new Date(),
+        updatedAt: Date.now(),
       })
       .where(
         and(
@@ -296,7 +297,7 @@ export async function linkPagesAsChildren(
       .set({
         parentPageId: parentPageId,
         folderId: folderId,
-        updatedAt: new Date(),
+        updatedAt: Date.now(),
       })
       .where(
         and(
@@ -364,12 +365,12 @@ export async function updatePage(pageId: string, input: UpdatePageInput): Promis
   // Build update object
   const updates: Partial<Page> = {
     ...parsed.data,
-    updatedAt: new Date(),
+    updatedAt: Date.now(),
   }
   
   // Handle task completion timestamp
   if (parsed.data.taskCompleted === true) {
-    updates.taskCompletedAt = new Date()
+    updates.taskCompletedAt = Date.now()
   } else if (parsed.data.taskCompleted === false) {
     updates.taskCompletedAt = null
   }
@@ -423,7 +424,7 @@ export async function reorderPages(pageIds: string[]): Promise<void> {
   for (let i = 0; i < pageIds.length; i++) {
     await db
       .update(pages)
-      .set({ order: i, updatedAt: new Date() })
+      .set({ order: i, updatedAt: Date.now() })
       .where(
         and(
           eq(pages.id, pageIds[i]),
@@ -461,7 +462,7 @@ export async function togglePageStarred(pageId: string): Promise<Page> {
   
   const [updated] = await db
     .update(pages)
-    .set({ starred: newStarred, updatedAt: new Date() })
+    .set({ starred: newStarred, updatedAt: Date.now() })
     .where(
       and(
         eq(pages.id, pageId),

@@ -31,8 +31,8 @@ export default function RegisterPage() {
     width: '100%',
     height: '52px',
     borderRadius: '12px',
-    border: '1px solid rgba(0, 0, 0, 0.08)',
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    border: '1px solid rgba(0, 0, 0, 0.15)',
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
     fontSize: '16px',
     color: '#1a1a1a',
     outline: 'none',
@@ -110,7 +110,7 @@ export default function RegisterPage() {
           <p
             style={{
               fontSize: '15px',
-              color: '#8e8e93',
+              color: '#6e6e73',
               marginTop: '8px',
               lineHeight: 1.5,
             }}
@@ -195,7 +195,7 @@ export default function RegisterPage() {
               <p
                 style={{
                   fontSize: '12px',
-                  color: '#aeaeb2',
+                  color: '#86868b',
                   marginTop: '6px',
                   paddingLeft: '2px',
                 }}
@@ -265,7 +265,7 @@ export default function RegisterPage() {
           style={{
             textAlign: 'center',
             fontSize: '14px',
-            color: '#8e8e93',
+            color: '#6e6e73',
             marginTop: '28px',
             lineHeight: 1.5,
           }}

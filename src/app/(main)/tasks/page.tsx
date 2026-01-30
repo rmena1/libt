@@ -1,14 +1,8 @@
-import { getTasks, getTaskStats } from '@/lib/actions/tasks'
 import { TaskList } from './task-list'
 
 export const dynamic = 'force-dynamic'
 
 export default async function TasksPage() {
-  const [taskGroups, stats] = await Promise.all([
-    getTasks(),
-    getTaskStats(),
-  ])
-
   return (
     <div style={{ 
       minHeight: '100vh', 
@@ -38,70 +32,12 @@ export default async function TasksPage() {
           }}>
             Tasks
           </h1>
-          
-          {/* Stats bar - pill-style badges */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px',
-            marginTop: '12px',
-            flexWrap: 'wrap',
-          }}>
-            {stats.overdue > 0 && (
-              <span style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                fontSize: '13px',
-                fontWeight: 600,
-                color: '#dc2626',
-                backgroundColor: 'rgba(220, 38, 38, 0.08)',
-                padding: '4px 10px 4px 8px',
-                borderRadius: '20px',
-              }}>
-                <span style={{
-                  width: '7px',
-                  height: '7px',
-                  borderRadius: '50%',
-                  backgroundColor: '#dc2626',
-                  flexShrink: 0,
-                }} />
-                {stats.overdue} overdue
-              </span>
-            )}
-            {stats.dueToday > 0 && (
-              <span style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                fontSize: '13px',
-                fontWeight: 600,
-                color: '#2563eb',
-                backgroundColor: 'rgba(37, 99, 235, 0.08)',
-                padding: '4px 10px 4px 8px',
-                borderRadius: '20px',
-              }}>
-                <span style={{
-                  width: '7px',
-                  height: '7px',
-                  borderRadius: '50%',
-                  backgroundColor: '#2563eb',
-                  flexShrink: 0,
-                }} />
-                {stats.dueToday} today
-              </span>
-            )}
-          </div>
         </div>
       </div>
 
-      {/* Task List */}
+      {/* Task List - data comes from Zero */}
       <div style={{ maxWidth: '680px', margin: '0 auto', padding: '16px 24px 140px' }}>
-        <TaskList 
-          overdue={taskGroups.overdue}
-          pending={taskGroups.pending}
-          completed={taskGroups.completed}
-        />
+        <TaskList />
       </div>
     </div>
   )

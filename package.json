@@ -10,15 +10,19 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "zero:dev": "ZERO_UPSTREAM_DB=postgresql://postgres:postgres@localhost:5432/libt ZERO_QUERY_URL=http://localhost:3000/api/zero/query ZERO_MUTATE_URL=http://localhost:3000/api/zero/mutate ZERO_QUERY_FORWARD_COOKIES=true ZERO_MUTATE_FORWARD_COOKIES=true npx zero-cache-dev"
   },
   "dependencies": {
+    "@rocicorp/zero": "^0.25.11",
+    "@types/pg": "^8.16.0",
     "bcryptjs": "^3.0.3",
     "better-sqlite3": "^12.6.2",
     "clsx": "^2.1.1",
     "drizzle-orm": "^0.45.1",
     "nanoid": "^5.1.6",
     "next": "16.1.4",
+    "pg": "^8.17.2",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "tailwind-merge": "^3.4.0",
