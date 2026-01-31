@@ -44,9 +44,10 @@ export function ZeroAppProvider({ userID, children }: ZeroAppProviderProps) {
       cacheURL={cacheURL}
       schema={schema}
       mutators={mutators}
-      kvStore="mem"
+      kvStore="idb"
       pingTimeoutMs={30_000}
       queryChangeThrottleMs={100}
+      hiddenTabDisconnectDelay={0}
       onUpdateNeeded={(reason) => {
         console.warn('[Zero] Update needed:', reason)
         // Don't auto-reload — just log it

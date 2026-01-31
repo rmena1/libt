@@ -69,7 +69,7 @@ test.describe('Search Modal - Complete Flow', () => {
     await page.screenshot({ path: 'screenshots/search-07-closed-backdrop.png', fullPage: true });
   });
 
-  test('search with empty query shows no results section', async ({ page }) => {
+  test('search with empty query and gibberish shows no results', async ({ page }) => {
     await page.goto('/daily');
     await page.waitForLoadState('domcontentloaded');
     await page.waitForTimeout(2000);
@@ -78,10 +78,12 @@ test.describe('Search Modal - Complete Flow', () => {
     await page.keyboard.press('Meta+k');
     await page.waitForTimeout(500);
 
+    const searchModal = page.locator('[data-testid="search-modal"]');
+    await expect(searchModal).toBeVisible({ timeout: 3000 });
     const searchInput = page.locator('[data-testid="search-input"]');
     await expect(searchInput).toBeVisible();
 
-    // Empty query should show no results list
+    // Empty query state
     await page.screenshot({ path: 'screenshots/search-08-empty-query.png', fullPage: true });
 
     // Type gibberish that won't match
@@ -89,5 +91,11 @@ test.describe('Search Modal - Complete Flow', () => {
     await page.waitForTimeout(500);
     await expect(page.locator('text=No results found')).toBeVisible();
     await page.screenshot({ path: 'screenshots/search-09-no-match.png', fullPage: true });
+
+    // Clear and close
+    await searchInput.press('Escape');
+    await page.waitForTimeout(300);
+    await expect(searchModal).not.toBeVisible();
+    await page.screenshot({ path: 'screenshots/search-10-closed-after-no-match.png', fullPage: true });
   });
 });

@@ -41,6 +41,24 @@ export function DailyNotes({
   const [currentViewDate, setCurrentViewDate] = useState(today())
   const [isAddBubbleOpen, setIsAddBubbleOpen] = useState(false)
   
+  // Listen for "New" button from bottom nav
+  useEffect(() => {
+    // Check URL param on mount
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('add') === 'true') {
+      setIsAddBubbleOpen(true)
+      // Clean up URL
+      params.delete('add')
+      const newUrl = params.toString() ? `${window.location.pathname}?${params}` : window.location.pathname
+      window.history.replaceState({}, '', newUrl)
+    }
+    
+    // Listen for custom event from bottom nav
+    const handler = () => setIsAddBubbleOpen(true)
+    window.addEventListener('libt:open-add-bubble', handler)
+    return () => window.removeEventListener('libt:open-add-bubble', handler)
+  }, [])
+  
   const containerRef = useRef<HTMLDivElement>(null)
   const todayRef = useRef<HTMLDivElement>(null)
   const dayRefs = useRef<Map<string, HTMLDivElement>>(new Map())
@@ -132,6 +150,34 @@ export function DailyNotes({
     return { pagesByDate: byDate, childPagesMap: childMap }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pagesFingerprint])
+  
+  // FIX: Build per-date childPagesMap so each DayCard gets a stable reference
+  // that only changes when ITS children change (not when any page changes).
+  // This prevents all DayCards from re-rendering when editing a single page.
+  const perDateChildMaps = useMemo(() => {
+    const result: Record<string, Record<string, ZeroPage[]>> = {}
+    for (const date in pagesByDate) {
+      const datePages = pagesByDate[date]
+      const dateChildMap: Record<string, ZeroPage[]> = {}
+      let hasChildren = false
+      for (const page of datePages) {
+        const children = childPagesMap[page.id]
+        if (children) {
+          dateChildMap[page.id] = children
+          hasChildren = true
+          // Also include grandchildren (children of children)
+          for (const child of children) {
+            const grandchildren = childPagesMap[child.id]
+            if (grandchildren) {
+              dateChildMap[child.id] = grandchildren
+            }
+          }
+        }
+      }
+      result[date] = hasChildren ? dateChildMap : EMPTY_CHILD_MAP
+    }
+    return result
+  }, [pagesByDate, childPagesMap])
   
   // Group projected tasks by taskDate (excluding tasks on their own dailyDate)
   const projectedTasksFingerprint = useMemo(() => {
@@ -414,7 +460,7 @@ export function DailyNotes({
                 projectedTasks={projectedTasks[date] ?? EMPTY_TASKS}
                 overdueTasks={date === todayDate ? (overdueTasksRaw as ZeroPage[] ?? EMPTY_TASKS) : undefined}
                 allFolders={initialFolders}
-                childPagesMap={childPagesMap}
+                childPagesMap={perDateChildMaps[date] ?? EMPTY_CHILD_MAP}
               />
             ) : (
               <div style={{ minHeight: '280px', padding: '32px 16px' }}>

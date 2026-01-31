@@ -211,9 +211,9 @@ export async function linkDailyVisualChildren(parentPageId: string): Promise<Pag
   
   if (!parent || !parent.dailyDate) return []
   
-  // Get pages for the same daily date that were created at or after the parent.
-  // We filter by createdAt to avoid picking up unrelated pages from other sessions
-  // that happen to share the same dailyDate but have different order values.
+  // Get all root pages for the same daily date, ordered by their visual order.
+  // We use the `order` field (not createdAt) because users can reorder pages
+  // via drag-and-drop, which changes `order` but not `createdAt`.
   const allPages = await db
     .select()
     .from(pages)
@@ -221,11 +221,10 @@ export async function linkDailyVisualChildren(parentPageId: string): Promise<Pag
       and(
         eq(pages.userId, session.id),
         eq(pages.dailyDate, parent.dailyDate),
-        isNull(pages.parentPageId),
-        gte(pages.createdAt, parent.createdAt)
+        isNull(pages.parentPageId)
       )
     )
-    .orderBy(asc(pages.createdAt))
+    .orderBy(asc(pages.order), asc(pages.createdAt))
   
   // Find the parent's position in the filtered list
   const parentIndex = allPages.findIndex(p => p.id === parentPageId)

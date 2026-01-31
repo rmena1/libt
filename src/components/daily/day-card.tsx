@@ -528,69 +528,73 @@ export const DayCard = memo(function DayCard({ date, pages: pagesProp = [], proj
     if (isCreatingRef.current) return
     isCreatingRef.current = true
     
-    // Calculate order with midpoint/shift logic
-    let order: number
-    if (afterIndex !== undefined && afterIndex < pages.length) {
-      const currentOrder = pages[afterIndex].order ?? afterIndex
-      const nextPage = pages[afterIndex + 1]
-      if (nextPage) {
-        const nextOrder = nextPage.order ?? (afterIndex + 1)
-        if (nextOrder - currentOrder > 1) {
-          order = Math.floor((currentOrder + nextOrder) / 2)
-          if (order <= currentOrder) {
+    try {
+      // Calculate order with midpoint/shift logic
+      let order: number
+      if (afterIndex !== undefined && afterIndex < pages.length) {
+        const currentOrder = pages[afterIndex].order ?? afterIndex
+        const nextPage = pages[afterIndex + 1]
+        if (nextPage) {
+          const nextOrder = nextPage.order ?? (afterIndex + 1)
+          if (nextOrder - currentOrder > 1) {
+            order = Math.floor((currentOrder + nextOrder) / 2)
+            if (order <= currentOrder) {
+              for (let i = afterIndex + 1; i < pages.length; i++) {
+                z.mutate.page.update({ id: pages[i].id, order: (pages[i].order ?? i) + 2 })
+              }
+              order = currentOrder + 1
+            }
+          } else {
             for (let i = afterIndex + 1; i < pages.length; i++) {
               z.mutate.page.update({ id: pages[i].id, order: (pages[i].order ?? i) + 2 })
             }
             order = currentOrder + 1
           }
         } else {
-          for (let i = afterIndex + 1; i < pages.length; i++) {
-            z.mutate.page.update({ id: pages[i].id, order: (pages[i].order ?? i) + 2 })
-          }
           order = currentOrder + 1
         }
       } else {
-        order = currentOrder + 1
+        const lastPage = pages[pages.length - 1]
+        order = lastPage ? (lastPage.order ?? pages.length - 1) + 1 : 0
       }
-    } else {
-      const lastPage = pages[pages.length - 1]
-      order = lastPage ? (lastPage.order ?? pages.length - 1) + 1 : 0
-    }
-    
-    const newId = generateId()
-    const finalIndent = indent ?? 0
-    
-    // Determine folder info
-    let parentPageId: string | null | undefined = folderInfo?.parentPageId
-    let folderId: string | null | undefined = folderInfo?.folderId
-    if (!folderId && finalIndent > 0 && afterIndex !== undefined) {
-      for (let i = afterIndex; i >= 0; i--) {
-        if ((pages[i].indent ?? 0) === 0) {
-          if (pages[i].folderId) {
-            parentPageId = pages[i].id
-            folderId = pages[i].folderId
+      
+      const newId = generateId()
+      const finalIndent = indent ?? 0
+      
+      // Determine folder info
+      let parentPageId: string | null | undefined = folderInfo?.parentPageId
+      let folderId: string | null | undefined = folderInfo?.folderId
+      if (!folderId && finalIndent > 0 && afterIndex !== undefined) {
+        for (let i = afterIndex; i >= 0; i--) {
+          if ((pages[i].indent ?? 0) === 0) {
+            if (pages[i].folderId) {
+              parentPageId = pages[i].id
+              folderId = pages[i].folderId
+            }
+            break
           }
-          break
         }
       }
+      
+      const insertPayload = newPageInsert(z.userID, {
+        id: newId,
+        content: initialContent ?? '',
+        indent: finalIndent,
+        dailyDate: date,
+        order,
+        ...(folderId ? { folderId, parentPageId } : {}),
+      })
+      z.mutate.page.insert(insertPayload)
+      
+      if (shouldFocus) {
+        setFocusPageId(newId)
+        setFocusCursorPos(initialContent ? 0 : undefined)
+      }
+    } catch (err) {
+      console.error('handleCreatePage error:', err)
+    } finally {
+      isCreatingRef.current = false
     }
-    
-    const insertPayload = newPageInsert(z.userID, {
-      id: newId,
-      content: initialContent ?? '',
-      indent: finalIndent,
-      dailyDate: date,
-      order,
-      ...(folderId ? { folderId, parentPageId } : {}),
-    })
-    z.mutate.page.insert(insertPayload)
-    
-    if (shouldFocus) {
-      setFocusPageId(newId)
-      setFocusCursorPos(initialContent ? 0 : undefined)
-    }
-    
-    isCreatingRef.current = false
   }, [date, pages, z.mutate, z.userID])
   
   // Create a child page under a folder-tagged parent
@@ -604,43 +608,47 @@ export const DayCard = memo(function DayCard({ date, pages: pagesProp = [], proj
     if (isCreatingRef.current) return
     isCreatingRef.current = true
 
-    const children = childPagesMap?.[parentPageId]?.filter(c => !pages.some(p => p.id === c.id)) ?? []
-    let order: number
+    try {
+      const children = childPagesMap?.[parentPageId]?.filter(c => !pages.some(p => p.id === c.id)) ?? []
+      let order: number
 
-    if (afterChildIndex < 0 || children.length === 0) {
-      const firstChild = children[0]
-      order = firstChild ? (firstChild.order ?? 0) - 1 : 0
-    } else {
-      const current = children[afterChildIndex]
-      const next = children[afterChildIndex + 1]
-      const currentOrder = current?.order ?? afterChildIndex
-      if (next) {
-        const nextOrder = next.order ?? (afterChildIndex + 1)
-        order = Math.floor((currentOrder + nextOrder) / 2)
-        if (order <= currentOrder) order = currentOrder + 1
+      if (afterChildIndex < 0 || children.length === 0) {
+        const firstChild = children[0]
+        order = firstChild ? (firstChild.order ?? 0) - 1 : 0
       } else {
-        order = currentOrder + 1
+        const current = children[afterChildIndex]
+        const next = children[afterChildIndex + 1]
+        const currentOrder = current?.order ?? afterChildIndex
+        if (next) {
+          const nextOrder = next.order ?? (afterChildIndex + 1)
+          order = Math.floor((currentOrder + nextOrder) / 2)
+          if (order <= currentOrder) order = currentOrder + 1
+        } else {
+          order = currentOrder + 1
+        }
       }
+
+      const newId = generateId()
+      const insertPayload = newPageInsert(z.userID, {
+        id: newId,
+        content: initialContent ?? '',
+        indent: 0,
+        dailyDate: date,
+        order,
+        folderId,
+        parentPageId,
+      })
+      z.mutate.page.insert(insertPayload)
+
+      if (shouldFocus) {
+        setFocusPageId(newId)
+        setFocusCursorPos(initialContent ? 0 : undefined)
+      }
+    } catch (err) {
+      console.error('handleCreateChildPage error:', err)
+    } finally {
+      isCreatingRef.current = false
     }
-
-    const newId = generateId()
-    const insertPayload = newPageInsert(z.userID, {
-      id: newId,
-      content: initialContent ?? '',
-      indent: 0,
-      dailyDate: date,
-      order,
-      folderId,
-      parentPageId,
-    })
-    z.mutate.page.insert(insertPayload)
-
-    if (shouldFocus) {
-      setFocusPageId(newId)
-      setFocusCursorPos(initialContent ? 0 : undefined)
-    }
-
-    isCreatingRef.current = false
   }, [date, childPagesMap, pages, z.mutate, z.userID])
 
   // Update a page via Zero mutate

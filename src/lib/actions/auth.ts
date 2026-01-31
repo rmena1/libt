@@ -34,6 +34,18 @@ export async function register(formData: FormData): Promise<AuthActionResult> {
   
   const { email, password } = parsed.data
   
+  // Check registration allowlist (personal app — restrict who can register)
+  const allowedEmails = process.env.ALLOWED_REGISTRATION_EMAILS
+  if (allowedEmails) {
+    const allowed = allowedEmails.split(',').map(e => e.trim().toLowerCase())
+    if (!allowed.includes(email.toLowerCase())) {
+      return {
+        success: false,
+        error: 'Registration is not open. Contact the administrator.',
+      }
+    }
+  }
+  
   // Check if user already exists
   const existingUser = await db
     .select({ id: users.id })

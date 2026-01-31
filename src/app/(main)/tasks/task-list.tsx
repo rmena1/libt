@@ -8,28 +8,36 @@ import { today, addDays } from '@/lib/utils'
 
 export function TaskList() {
   const z = useZero()
-  const todayStr = today()
+  const todayStr = useMemo(() => today(), [])
+  const upcoming3Days = useMemo(() => addDays(todayStr, 3), [todayStr])
   
-  // Single query for all tasks (reactive via Zero)
-  const [allTasks] = useQuery(
+  // Split into targeted queries instead of fetching ALL tasks
+  // Active tasks: not completed (small, bounded set)
+  const [activeTasks] = useQuery(
     z.query.page
       .where('isTask', true)
+      .where('taskCompleted', false)
       .orderBy('taskDate', 'asc')
       .orderBy('createdAt', 'desc')
   )
   
-  // Split into sections via useMemo
-  const { overdue, todayTasks, upcomingTasks, completed } = useMemo(() => {
-    const upcoming3Days = addDays(todayStr, 3)
+  // Completed tasks: only recent ones (last 50), avoids unbounded growth
+  const [completedTasks] = useQuery(
+    z.query.page
+      .where('isTask', true)
+      .where('taskCompleted', true)
+      .orderBy('taskCompletedAt', 'desc')
+      .limit(50)
+  )
+  
+  // Split active tasks into sections via useMemo
+  const { overdue, todayTasks, upcomingTasks } = useMemo(() => {
     const overdue: ZeroPage[] = []
     const todayTasks: ZeroPage[] = []
     const upcomingTasks: ZeroPage[] = []
-    const completed: ZeroPage[] = []
     
-    for (const task of allTasks as ZeroPage[]) {
-      if (task.taskCompleted) {
-        completed.push(task)
-      } else if (task.taskDate && task.taskDate < todayStr) {
+    for (const task of activeTasks as ZeroPage[]) {
+      if (task.taskDate && task.taskDate < todayStr) {
         overdue.push(task)
       } else if (task.taskDate === todayStr) {
         todayTasks.push(task)
@@ -38,8 +46,10 @@ export function TaskList() {
       }
     }
     
-    return { overdue, todayTasks, upcomingTasks, completed }
-  }, [allTasks, todayStr])
+    return { overdue, todayTasks, upcomingTasks }
+  }, [activeTasks, todayStr, upcoming3Days])
+  
+  const completed = completedTasks as ZeroPage[]
 
   const isEmpty = overdue.length === 0 && todayTasks.length === 0 && upcomingTasks.length === 0
 
@@ -106,14 +116,11 @@ export function TaskList() {
       )}
 
       {completed.length > 0 && (
-        <section style={{ marginTop: '16px', opacity: 0.7 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 4px', color: '#9ca3af', fontSize: '12px', fontWeight: 500 }}>
-            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-            </svg>
-            {completed.length} completed
-          </div>
-        </section>
+        <TaskSection label="Completed" color="#9ca3af" count={completed.length} cardStyle={cardStyle} defaultOpen={false}>
+          {completed.map((task, index) => (
+            <TaskItem key={task.id} task={task as any} onUpdate={noop} onDelete={noop} isCompleted isLast={index === completed.length - 1} />
+          ))}
+        </TaskSection>
       )}
 
       <style>{`
@@ -126,10 +133,10 @@ export function TaskList() {
   )
 }
 
-function TaskSection({ label, color, count, cardStyle, children }: {
-  label: string; color: string; count: number; cardStyle: React.CSSProperties; children: React.ReactNode
+function TaskSection({ label, color, count, cardStyle, children, defaultOpen = true }: {
+  label: string; color: string; count: number; cardStyle: React.CSSProperties; children: React.ReactNode; defaultOpen?: boolean
 }) {
-  const [isOpen, setIsOpen] = useState(true)
+  const [isOpen, setIsOpen] = useState(defaultOpen)
   
   return (
     <section>

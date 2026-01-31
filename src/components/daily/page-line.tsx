@@ -670,10 +670,38 @@ export const PageLine = memo(forwardRef<PageLineHandle, PageLineProps>(function 
     unregisterActions()
     setShowAutocomplete(false)
     
-    // Save any pending changes immediately
+    // Flush any pending changes IMMEDIATELY (not debounced) to prevent data loss
+    // if the component unmounts before the debounce timer fires
     if (content !== lastSavedContent.current) {
       debouncedSave.cancel()
-      debouncedSave(content)
+      // Call the save logic directly instead of re-debouncing
+      const newContent = content
+      const currentPage = pageRef.current
+      const currentDailyDate = dailyDateRef.current
+      const parsed = parseTaskContent(newContent)
+      
+      let taskDate: string | null = null
+      let taskPriority: 'low' | 'medium' | 'high' | null = null
+      
+      if (parsed.isTask) {
+        const dateResult = parseTaskDate(parsed.textContent)
+        const priorityResult = parseTaskPriority(parsed.textContent)
+        taskDate = dateResult.date ?? currentDailyDate ?? null
+        taskPriority = priorityResult.priority
+      }
+      
+      lastSavedContent.current = newContent
+      setIsTaskCompleted(parsed.isTask ? parsed.isCompleted : false)
+      
+      onUpdateRef.current?.({
+        ...currentPage,
+        content: newContent,
+        isTask: parsed.isTask,
+        taskCompleted: parsed.isTask ? parsed.isCompleted : false,
+        taskDate,
+        taskPriority,
+        updatedAt: Date.now(),
+      })
     }
   }
   
@@ -869,7 +897,7 @@ export const PageLine = memo(forwardRef<PageLineHandle, PageLineProps>(function 
       <div className="flex-1 min-w-0 relative">
         <div className={cn(
           "flex gap-2",
-          isProjected ? "flex-col md:flex-row md:items-start" : "items-start"
+          isProjected ? "flex-col" : "items-start"
         )}>
           {/* Main content row */}
           <div className="flex items-start gap-2 flex-1 min-w-0">
@@ -1033,7 +1061,7 @@ export const PageLine = memo(forwardRef<PageLineHandle, PageLineProps>(function 
           
           {/* Projected task badges - stacked vertically on mobile */}
           {isProjected && (
-            <div className="flex flex-wrap gap-1.5 md:flex-nowrap md:items-start">
+            <div className="flex flex-wrap gap-1.5 items-center">
               {/* Date badge */}
               {taskInfo.isTask && dateInfo?.displayText && !isTaskCompleted && (
                 <span 

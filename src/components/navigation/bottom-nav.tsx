@@ -7,6 +7,7 @@ interface NavItem {
   href: string
   icon: React.ReactNode
   placeholder?: boolean
+  isNew?: boolean
 }
 
 export function BottomNav() {
@@ -42,8 +43,8 @@ export function BottomNav() {
     },
     {
       name: 'New',
-      href: '/new',
-      placeholder: true,
+      href: '#new',
+      isNew: true,
       icon: (
         <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
@@ -86,11 +87,19 @@ export function BottomNav() {
       {navItems.map((item) => {
         const active = isActive(item.href)
         
-        if (item.placeholder) {
+        if (item.isNew) {
           return (
             <button
               key={item.href}
-              onClick={() => alert(`${item.name}: Coming soon!`)}
+              onClick={() => {
+                // If already on /daily, dispatch event to open add bubble
+                if (pathname === '/daily' || pathname.startsWith('/daily?')) {
+                  window.dispatchEvent(new CustomEvent('libt:open-add-bubble'))
+                } else {
+                  // Navigate to daily with add param
+                  window.location.href = '/daily?add=true'
+                }
+              }}
               style={{
                 display: 'flex',
                 flexDirection: 'column',
@@ -101,15 +110,28 @@ export function BottomNav() {
                 border: 'none',
                 background: 'none',
                 cursor: 'pointer',
-                color: '#9ca3af',
+                color: '#6b7280',
                 transition: 'color 150ms ease',
               }}
             >
-              <span style={{ opacity: 0.7 }}>{item.icon}</span>
+              <span style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '10px',
+                backgroundColor: '#111827',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#ffffff',
+              }}>
+                <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                </svg>
+              </span>
               <span
                 style={{
                   fontSize: '10px',
-                  marginTop: '4px',
+                  marginTop: '2px',
                   fontWeight: 500,
                   letterSpacing: '0.01em',
                 }}

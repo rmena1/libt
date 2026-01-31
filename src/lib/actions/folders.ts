@@ -349,8 +349,34 @@ export async function deleteFolder(folderId: string): Promise<void> {
   const descendantIds = collectDescendantIds(folderId, allFolders)
   const allFolderIds = [folderId, ...descendantIds]
 
-  // Unlink pages from all affected folders
+  // Unlink pages from all affected folders AND reset parentPageId
+  // for child pages so they become visible in the daily view again.
+  // First, get all page IDs in these folders (they may be parents of child pages)
   for (const id of allFolderIds) {
+    const folderPageIds = await db
+      .select({ id: pages.id })
+      .from(pages)
+      .where(
+        and(
+          eq(pages.userId, session.id),
+          eq(pages.folderId, id)
+        )
+      )
+
+    // Reset parentPageId on any child pages pointing to these folder pages
+    for (const fp of folderPageIds) {
+      await db
+        .update(pages)
+        .set({ parentPageId: null, folderId: null, updatedAt: Date.now() })
+        .where(
+          and(
+            eq(pages.userId, session.id),
+            eq(pages.parentPageId, fp.id)
+          )
+        )
+    }
+
+    // Unlink the top-level folder pages themselves
     await db
       .update(pages)
       .set({ folderId: null, updatedAt: Date.now() })
